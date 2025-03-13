@@ -15,11 +15,11 @@ private:
 public:
     std::shared_ptr<Camera> camera = std::make_shared<Camera>();
 
-    double scrollRate =1;
-    double minDistance = 0.1;
+    float scrollRate = 10.0;
+    float minDistance = 0.1;
 
-    double orbitRate = 0.5;
-    double maxOrbitRate = 1;
+    float orbitRate = 0.5;
+    float maxOrbitRate = 1;
 
     OrbitCamera() : Node(), pressed(false) {
         children.push_back(camera);
@@ -50,10 +50,10 @@ public:
 
     void orbit(double xpos, double ypos, double deltaTime) {
         if (pressed) {
-            double dx = xpos - p_xpos;
-            double dy = ypos - p_ypos;
+            float dx = xpos - p_xpos;
+            float dy = ypos - p_ypos;
 
-            double rate = orbitRate * deltaTime;
+            float rate = orbitRate * deltaTime;
             dx = std::min(maxOrbitRate, std::max(-maxOrbitRate, dx * rate));
             dy = std::min(maxOrbitRate, std::max(-maxOrbitRate, dy * rate));
 

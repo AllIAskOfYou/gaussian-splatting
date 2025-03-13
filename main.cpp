@@ -17,6 +17,10 @@
 #include <glm/ext.hpp>
 #include <glm/gtx/io.hpp>
 
+#include <imgui.h>
+#include <backends/imgui_impl_wgpu.h>
+#include <backends/imgui_impl_glfw.h>
+
 #include "ResourceManager.h"
 
 #include "Node.h"
@@ -43,10 +47,12 @@ public:
 	bool IsRunning();
 
 private:
-	struct TransformMatrix {
+	struct Uniforms {
 		glm::mat4x4 projectionMatrix;
 		glm::mat4x4 viewMatrix;
 		glm::mat4x4 modelMatrix;
+		glm::vec3 _pad;
+		float splatSize=0.01;
 	};
 
 	struct Quad {
@@ -66,10 +72,18 @@ private:
 	void UpdateScene();
 	RenderPassEncoder createRenderPassEncoder(TextureView &targetView, CommandEncoder &encoder);
 
-	// Event handlers for interaction
+// Event handlers for interaction
+private:
 	void onMouseMove(double xpos, double ypos);
     void onMouseButton(int button, int action, int mods);
     void onScroll(double xoffset, double yoffset);
+
+private:
+    bool initGui(); // called in onInit
+    void terminateGui(); // called in onFinish
+    void updateGui(wgpu::RenderPassEncoder renderPass); // called in onFrame
+
+	void guiAddSliderParameter(const char* label, float* value, float min, float max);
 
 private:
 	// We put here all the variables that are shared between init and main loop
@@ -97,9 +111,13 @@ private:
 
 	SplatMesh splatMesh;
 
+	Uniforms uniforms;
+
+	ImGuiIO imGuiIo;
+
 
 	// time
-	double time;
+	//double time;
 	double deltaTime;
 };
 
@@ -137,6 +155,11 @@ void Application::onMouseMove(double xpos, double ypos) {
 }
 
 void Application::onMouseButton(int button, int action, int mods) {
+    if (imGuiIo.WantCaptureMouse) {
+        // Don't rotate the camera if the mouse is already captured by an ImGui
+        // interaction at this frame.
+        return;
+    }
 	orbitCamera->onMouseButton(button, action, mods);
 }
 
@@ -253,7 +276,9 @@ bool Application::Initialize() {
 	InitializeScene();
 
 	// Initialize time
-	time = glfwGetTime();
+	//time = glfwGetTime();
+
+	if (!initGui()) return false;
 
 	return true;
 }
@@ -266,28 +291,28 @@ void Application::Terminate() {
 	device.release();
 	glfwDestroyWindow(m_window);
 	glfwTerminate();
+	terminateGui();
 }
 
 void Application::MainLoop() {
 	// Update time
-	double newTime = glfwGetTime();
-	deltaTime = newTime - time;
-	time = newTime;
+	imGuiIo = ImGui::GetIO();
+	deltaTime = imGuiIo.DeltaTime;
+	
 
-	printf("FPS: %f\n", 1.0 / deltaTime);
+	//printf("FPS: %f\n", 1.0 / deltaTime);
 	glfwPollEvents();
 
 	// Update the scene
 	UpdateScene();
 
 	// Create a transform matrix
-	TransformMatrix transform;
-	transform.projectionMatrix = camera->getProjectionMatrix();
-	transform.viewMatrix = camera->getViewMatrix();
-	transform.modelMatrix = splatNode->worldMatrix;
+	uniforms.projectionMatrix = camera->getProjectionMatrix();
+	uniforms.viewMatrix = camera->getViewMatrix();
+	uniforms.modelMatrix = splatNode->worldMatrix;
 
 	// Upload the transform matrix to the buffer
-	queue.writeBuffer(transformBuffer, 0, &transform, sizeof(TransformMatrix));
+	queue.writeBuffer(transformBuffer, 0, &uniforms, sizeof(Uniforms));
 
 	// Sort the splats
 	glm::vec3 cameraPos = glm::vec3(camera->worldMatrix * glm::vec4(camera->position, 1.0f));
@@ -315,6 +340,8 @@ void Application::MainLoop() {
 
 	// Draw the splat
 	renderPass.drawIndexed(6, splatMesh.splatCount, 0, 0, 0);
+
+	updateGui(renderPass);
 
 	renderPass.end();
 	renderPass.release();
@@ -527,7 +554,7 @@ void Application::InitializePipeline() {
 	// The stage that needs to access this resource
 	bindingLayout.visibility = ShaderStage::Vertex;
 	bindingLayout.buffer.type = BufferBindingType::Uniform;
-	bindingLayout.buffer.minBindingSize = sizeof(TransformMatrix);
+	bindingLayout.buffer.minBindingSize = sizeof(Uniforms);
 
 	// Create a bind group layout
 	BindGroupLayoutDescriptor bindGroupLayoutDesc{};
@@ -630,7 +657,7 @@ void Application::InitializePipeline() {
 	// The stage that needs to access this resource
 	bindingLayouts[0].visibility = ShaderStage::Vertex;
 	bindingLayouts[0].buffer.type = BufferBindingType::Uniform;
-	bindingLayouts[0].buffer.minBindingSize = sizeof(TransformMatrix);
+	bindingLayouts[0].buffer.minBindingSize = sizeof(Uniforms);
 
 	bindingLayouts[1].binding = 1;
 	bindingLayouts[1].visibility = ShaderStage::Vertex;
@@ -701,7 +728,7 @@ void Application::InitializeBuffers() {
 
 	// Create a transform uniform buffer
 	BufferDescriptor bufferDesc;
-	bufferDesc.size = sizeof(TransformMatrix);
+	bufferDesc.size = sizeof(Uniforms);
 	bufferDesc.usage = BufferUsage::CopyDst | BufferUsage::Uniform;
 	bufferDesc.mappedAtCreation = false;
 	transformBuffer = device.createBuffer(bufferDesc);
@@ -710,15 +737,11 @@ void Application::InitializeBuffers() {
 void Application::InitializeBindGroups() {
 	// Create a binding
 	BindGroupEntry bindings[3] = {};
-	// The index of the binding (the entries in bindGroupDesc can be in any order)
+	
 	bindings[0].binding = 0;
-	// The buffer it is actually bound to
 	bindings[0].buffer = transformBuffer;
-	// We can specify an offset within the buffer, so that a single buffer can hold
-	// multiple uniform blocks.
 	bindings[0].offset = 0;
-	// And we specify again the size of the buffer.
-	bindings[0].size = sizeof(TransformMatrix);
+	bindings[0].size = sizeof(Uniforms);
 
 	bindings[1].binding = 1;
 	bindings[1].buffer = splatMesh.splatBuffer;
@@ -757,4 +780,94 @@ void Application::UpdateScene() {
 	scene->updateWorldMatrix(glm::mat4(1.0f));
 };
 	
+bool Application::initGui() {
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::GetIO();
 
+    // Setup Platform/Renderer backends
+    ImGui_ImplGlfw_InitForOther(m_window, true);
+    ImGui_ImplWGPU_Init(device, 3, surfaceFormat);
+    return true;
+}
+
+void Application::terminateGui() {
+    ImGui_ImplGlfw_Shutdown();
+    ImGui_ImplWGPU_Shutdown();
+}
+
+void Application::guiAddSliderParameter(const char* label, float* value, float min, float max) {
+	ImGui::Separator();
+	// Left cell (Text)
+	ImGui::TableSetColumnIndex(0);
+	ImGui::Text(label);
+
+	// Right cell (Slider)
+	ImGui::TableSetColumnIndex(1);
+	const char* id = ("##" + std::string(label)).c_str();
+	ImGui::SliderFloat(id, value, min, max, "%.3f");
+	ImGui::TableNextRow();
+}
+
+void Application::updateGui(RenderPassEncoder renderPass) {
+    // Start the Dear ImGui frame
+    ImGui_ImplWGPU_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+	
+	float columnWidth = 100.0f;
+
+    // [...] Build our UI
+	ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
+	ImGui::Begin("Control Panel", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+
+	
+	ImGui::Text("SPLATS");
+	ImGui::Separator();
+
+	if (ImGui::BeginTable("table", 2, ImGuiTableFlags_SizingStretchProp)) {
+		ImGui::TableSetupColumn("Text", ImGuiTableColumnFlags_WidthFixed, columnWidth); // Auto stretch
+		ImGui::TableSetupColumn("Slider", ImGuiTableColumnFlags_WidthStretch, columnWidth); // Fixed width
+
+		ImGui::TableNextRow();
+
+		guiAddSliderParameter("size", &uniforms.splatSize, 0.001f, 0.1f);
+
+		ImGui::EndTable();
+	}
+	ImGui::Separator();
+
+	ImGui::Separator();
+	ImGui::Text("CAMERA");
+	ImGui::Separator();
+
+	if (ImGui::BeginTable("table2", 2, ImGuiTableFlags_SizingStretchProp)) {
+		ImGui::TableSetupColumn("Text", ImGuiTableColumnFlags_WidthFixed, columnWidth); // Auto stretch
+		ImGui::TableSetupColumn("Slider", ImGuiTableColumnFlags_WidthStretch, columnWidth); // Fixed width
+
+		ImGui::TableNextRow();
+
+		guiAddSliderParameter("Orbit rate", &(orbitCamera->orbitRate), 0.1f, 2.0f);
+		guiAddSliderParameter("Scroll rate", &(orbitCamera->scrollRate), 1.0f, 20.0f);
+
+		ImGui::EndTable();
+	}
+	ImGui::Separator();
+
+	ImGui::Separator();
+	ImGui::Text("STATS");
+	ImGui::Separator();
+	// Show fps
+	ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / imGuiIo.Framerate, imGuiIo.Framerate);
+
+	ImGui::End();
+
+    // Draw the UI
+    ImGui::EndFrame();
+    // Convert the UI defined above into low-level drawing commands
+    ImGui::Render();
+    // Execute the low-level drawing commands on the WebGPU backend
+    ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), renderPass);
+}

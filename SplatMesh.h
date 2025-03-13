@@ -67,7 +67,7 @@ public:
     void sortSplats(glm::vec3 cameraPos) {
         // measure the time needed to sort the splats
 
-        auto start = std::chrono::high_resolution_clock::now();
+        //auto start = std::chrono::high_resolution_clock::now();
 
         std::vector<float> distances(splatCount);
         for (uint32_t i = 0; i < splatCount; i++) {
@@ -86,9 +86,9 @@ public:
     #endif
         
 
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = end - start;
-        std::cout << "Time needed to sort the splats: " << elapsed.count() << "s" << std::endl;
+        //auto end = std::chrono::high_resolution_clock::now();
+        //std::chrono::duration<double> elapsed = end - start;
+        //std::cout << "Time needed to sort the splats: " << elapsed.count() << "s" << std::endl;
 
         queue.writeBuffer(sortIndexBuffer, 0, sortIndices.data(), splatCount * sizeof(uint32_t));
     }

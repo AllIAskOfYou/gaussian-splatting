@@ -1,10 +1,12 @@
 /**
  * A structure for the uniforms
  */
-struct TransfromMatrix {
+struct Uniforms {
     projectionMatrix: mat4x4f,
     viewMatrix: mat4x4f,
     modelMatrix: mat4x4f,
+	_pad: vec3f,
+	splatSize: f32,
 };
 
 struct Splat {
@@ -16,7 +18,7 @@ struct Splat {
 	_pad2: f32,
 };
 
-@group(0) @binding(0) var<uniform> transform: TransfromMatrix;
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(0) @binding(1) var<storage, read> splats: array<Splat>;
 @group(0) @binding(2) var<storage, read> sortedIndex: array<u32>;
 
@@ -48,16 +50,16 @@ struct VertexOutput {
 @vertex
 fn vs_main(@builtin(instance_index) instanceIndex: u32, vertex: VertexInput) -> VertexOutput {
 	var out: VertexOutput; // create the output struct
-	var s = 0.05;
-
+	var s = uniforms.splatSize;
+	//var s = 0.05;
 	var instance = splats[sortedIndex[instanceIndex]];
-	var center = transform.viewMatrix * 
-					transform.modelMatrix * 
+	var center = uniforms.viewMatrix * 
+					uniforms.modelMatrix * 
 					vec4f(instance.position, 1.0);
 	var z = center.z;
-	center = transform.projectionMatrix * center;
+	center = uniforms.projectionMatrix * center;
 	var pos = vec4f(vertex.position * s, 0.0, 1);
-	pos = transform.projectionMatrix * pos;
+	pos = uniforms.projectionMatrix * pos;
 	pos.w = 0.0;
 	out.position =  pos + center;
 	out.color = instance.color; 
