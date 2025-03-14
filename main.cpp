@@ -721,7 +721,7 @@ RequiredLimits Application::GetRequiredLimits(Adapter adapter) const {
 
 void Application::InitializeBuffers() {
 
-	splatMesh.loadData(RESOURCE_DIR "/nike.splat", true);
+	splatMesh.loadData(RESOURCE_DIR "/splats/nike.splat", true);
 	std::cout << "Loaded " << splatMesh.splatCount << " splats" << std::endl;
 
 	splatMesh.initialize(device, queue);
