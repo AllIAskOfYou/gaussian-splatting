@@ -721,7 +721,7 @@ RequiredLimits Application::GetRequiredLimits(Adapter adapter) const {
 
 void Application::InitializeBuffers() {
 
-	splatMesh.loadData(RESOURCE_DIR "/nike.splat");
+	splatMesh.loadData(RESOURCE_DIR "/nike.splat", true);
 	std::cout << "Loaded " << splatMesh.splatCount << " splats" << std::endl;
 
 	splatMesh.initialize(device, queue);
@@ -798,7 +798,6 @@ void Application::terminateGui() {
 }
 
 void Application::guiAddSliderParameter(const char* label, float* value, float min, float max) {
-	ImGui::Separator();
 	// Left cell (Text)
 	ImGui::TableSetColumnIndex(0);
 	ImGui::Text(label);
@@ -806,6 +805,7 @@ void Application::guiAddSliderParameter(const char* label, float* value, float m
 	// Right cell (Slider)
 	ImGui::TableSetColumnIndex(1);
 	const char* id = ("##" + std::string(label)).c_str();
+	ImGui::PushItemWidth(ImGui::GetColumnWidth() * 1.0f);
 	ImGui::SliderFloat(id, value, min, max, "%.3f");
 	ImGui::TableNextRow();
 }
@@ -817,48 +817,46 @@ void Application::updateGui(RenderPassEncoder renderPass) {
     ImGui::NewFrame();
 
 	
-	float columnWidth = 100.0f;
+	float columnWidth = 80.0f;
 
     // [...] Build our UI
 	ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
+	//ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(0, 0));
 	ImGui::Begin("Control Panel", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
 	
 	ImGui::Text("SPLATS");
-	ImGui::Separator();
+	
 
-	if (ImGui::BeginTable("table", 2, ImGuiTableFlags_SizingStretchProp)) {
+	if (ImGui::BeginTable("table", 2, ImGuiTableFlags_SizingFixedSame | ImGuiTableFlags_BordersOuter)) {
 		ImGui::TableSetupColumn("Text", ImGuiTableColumnFlags_WidthFixed, columnWidth); // Auto stretch
-		ImGui::TableSetupColumn("Slider", ImGuiTableColumnFlags_WidthStretch, columnWidth); // Fixed width
+		ImGui::TableSetupColumn("Slider", ImGuiTableColumnFlags_WidthStretch, 2*columnWidth); // Fixed width
 
+		ImGui::TableNextRow();
 		ImGui::TableNextRow();
 
 		guiAddSliderParameter("size", &uniforms.splatSize, 0.001f, 0.1f);
 
 		ImGui::EndTable();
 	}
-	ImGui::Separator();
 
-	ImGui::Separator();
 	ImGui::Text("CAMERA");
-	ImGui::Separator();
 
-	if (ImGui::BeginTable("table2", 2, ImGuiTableFlags_SizingStretchProp)) {
+	if (ImGui::BeginTable("table2", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersOuter)) {
 		ImGui::TableSetupColumn("Text", ImGuiTableColumnFlags_WidthFixed, columnWidth); // Auto stretch
-		ImGui::TableSetupColumn("Slider", ImGuiTableColumnFlags_WidthStretch, columnWidth); // Fixed width
+		ImGui::TableSetupColumn("Slider", ImGuiTableColumnFlags_None, 2*columnWidth); // Fixed width
 
 		ImGui::TableNextRow();
+		ImGui::TableNextRow();
 
-		guiAddSliderParameter("Orbit rate", &(orbitCamera->orbitRate), 0.1f, 2.0f);
-		guiAddSliderParameter("Scroll rate", &(orbitCamera->scrollRate), 1.0f, 20.0f);
+		guiAddSliderParameter("Orbit rate", &(orbitCamera->orbitRate), 0.01f, 2.0f);
+		guiAddSliderParameter("Scroll rate", &(orbitCamera->scrollRate), 0.1f, 20.0f);
 
 		ImGui::EndTable();
 	}
-	ImGui::Separator();
 
 	ImGui::Separator();
 	ImGui::Text("STATS");
-	ImGui::Separator();
 	// Show fps
 	ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / imGuiIo.Framerate, imGuiIo.Framerate);
 

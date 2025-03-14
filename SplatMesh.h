@@ -13,6 +13,13 @@
 
 using namespace wgpu;
 
+
+// C++ program to perform
+// iterative merge sort.
+#include <iostream>
+#include <vector>
+using namespace std;
+
 struct Quad {
     glm::vec2 position;
 	glm::vec2 uv;
@@ -38,8 +45,8 @@ public:
 
     std::vector<uint32_t> sortIndices;
 
-    void loadData(const std::string &path) {
-        bool success = ResourceManager::loadSplats(path, splatData, true);       
+    void loadData(const std::string &path, bool center) {
+        bool success = ResourceManager::loadSplats(path, splatData, center);       
         if (!success) {
             std::cerr << "Could not load splat!" << std::endl;
             exit(1);

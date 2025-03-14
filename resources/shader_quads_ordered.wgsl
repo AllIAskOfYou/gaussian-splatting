@@ -57,11 +57,13 @@ fn vs_main(@builtin(instance_index) instanceIndex: u32, vertex: VertexInput) -> 
 					uniforms.modelMatrix * 
 					vec4f(instance.position, 1.0);
 	var z = center.z;
-	center = uniforms.projectionMatrix * center;
-	var pos = vec4f(vertex.position * s, 0.0, 1);
-	pos = uniforms.projectionMatrix * pos;
-	pos.w = 0.0;
-	out.position =  pos + center;
+	var pos = vec4f(vertex.position * s, 0.0, 0.0);
+	pos = pos + center;
+	//center = uniforms.projectionMatrix * center;
+	//pos = uniforms.projectionMatrix * pos;
+	//pos.w = 0.0;
+	//out.position =  pos + center;
+	out.position = uniforms.projectionMatrix * pos;
 	out.color = instance.color; 
     out.uv = vertex.uv;
 	return out;
