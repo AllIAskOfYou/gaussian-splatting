@@ -5,7 +5,7 @@ struct Uniforms {
     projectionMatrix: mat4x4f,
     viewMatrix: mat4x4f,
     modelMatrix: mat4x4f,
-	_pad: vec3f,
+	_pad1: vec3f,
 	splatSize: f32,
 };
 
@@ -13,16 +13,6 @@ struct Splat {
 	transform: mat4x4f,
 	color: vec4f,
 };
-
-/*
-struct Splat {
-	variance: mat3x3f,
-	color: vec4f,
-	position: vec3f,
-	constant: f32,
-	_pad: vec3f,
-};
-*/
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(0) @binding(1) var<storage, read> splats: array<Splat>;
@@ -112,10 +102,8 @@ fn vs_main(@builtin(instance_index) instanceIndex: u32, vertex: VertexInput) -> 
 	var s_var_proj = var_to_trans(s_var_xy);
 
 
-	//var vertex_pos = s_vm * vec4f(vertex.position * s, 0.0, 1.0);
-	//var v_offset = vec4f(s_vm_xyz * vec3f(vertex.position * s, 0.0), 0.0);
-	//var v_offset = vec4f(s_var_proj * vertex.position * s, 0.0, 0.0);
-	var v_offset = vec4f(vertex.position * s, 0.0, 0.0);
+	//var v_offset = vec4f(s_var_proj * vertex.position * s, 0.0, 0.0);		->		// Uncomment for non-uniform splats
+	var v_offset = vec4f(vertex.position * s, 0.0, 0.0);							// Comment for non-uniform splats
 	var v_pos = s_center + v_offset;
 
 	var out: VertexOutput; // create the output struct
