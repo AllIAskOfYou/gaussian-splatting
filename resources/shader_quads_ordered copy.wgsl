@@ -10,7 +10,8 @@ struct Uniforms {
 };
 
 struct Splat {
-	transform: mat4x4f,
+	variance: mat4x4f,
+	position: vec4f,
 	color: vec4f,
 };
 
@@ -53,73 +54,55 @@ struct VertexOutput {
     @location(1) uv: vec2f,
 };
 
-fn var_to_trans(mat: mat2x2f) -> mat2x2f {
-	var a = mat[0][0];
-	var b = mat[1][0];
-	var c = mat[0][1];
-	var d = mat[1][1];
-	var trace = a + d;
-	var det = a * d - b * c;
-	var sqrt_term = sqrt(max(0.0f, trace * trace - 4.0 * det));
-	var lambda1 = (trace + sqrt_term) / 2.0;
-	var lambda2 = (trace - sqrt_term) / 2.0;
-	var v1: vec2f;
-	var v2: vec2f;
-	let err = 1e-6;
-	if (abs(b) < err && abs(c) < err) {
-		v1 = vec2f(1.0, 0.0);
-		v2 = vec2f(0.0, 1.0);
-	} else if (abs(b) < err) {
-		v1 = vec2f(lambda1 - d, c);
-		v2 = vec2f(lambda2 - d, c);
-	} else {
-		v1 = vec2f(b, lambda1 - a);
-		v2 = vec2f(b, lambda2 - a);
-	}
-		
-	v1 = normalize(v1);
-	v2 = normalize(v2);
-
-	if (v1.x < 0.0) {
-		v1 = -v1;
-	}
-	if (v2.x < 0.0) {
-		v2 = -v2;
-	}
-
-	var trans = mat2x2f(sqrt(lambda1) * v1, sqrt(lambda2) * v2);
-	return trans;
-}
-
 @vertex
+/*fn vs_main(@builtin(instance_index) instanceIndex: u32, vertex: VertexInput) -> VertexOutput {
+	var out: VertexOutput; // create the output struct
+	var s = uniforms.splatSize;
+	//var s = 0.05;
+	var instance = splats[sortedIndex[instanceIndex]];
+	var center = uniforms.viewMatrix * 
+					uniforms.modelMatrix * 
+					vec4f(instance.position, 1.0);
+	var z = center.z;
+	var pos = vec4f(vertex.position * s, 0.0, 0.0);
+	pos = pos + center;
+	//center = uniforms.projectionMatrix * center;
+	//pos = uniforms.projectionMatrix * pos;
+	//pos.w = 0.0;
+	//out.position =  pos + center;
+	out.position = uniforms.projectionMatrix * pos;
+	out.color = instance.color; 
+    out.uv = vertex.uv;
+	return out;
+}*/
+
 fn vs_main(@builtin(instance_index) instanceIndex: u32, vertex: VertexInput) -> VertexOutput {
 	var s = uniforms.splatSize;
+	var instance = splats[sortedIndex[instanceIndex]];
+	var position = instance.position.xyz;
+	//var constant = instance.position.w;
+	var variance = mat3x3f(instance.variance[0].xyz, instance.variance[1].xyz, instance.variance[2].xyz);
 	var vm = uniforms.viewMatrix;
 	var mm = uniforms.modelMatrix;
 	var wt = vm * mm;
+	var w = mat3x3f(wt[0].xyz, wt[1].xyz, wt[2].xyz);
+	var variance_view = w * variance * transpose(w);
+	var v = mat2x2f(variance_view[0].xy, variance_view[1].xy);
 
-	var instance = splats[sortedIndex[instanceIndex]];
-	var sm = instance.transform;
-	var s_vm = wt * sm;
-	var s_center = s_vm[3];
-	var z = s_center.z;
-	var d = 1.0 / max(1e-6, z);
-	var s_vm_xyz = mat3x3f(s_vm[0].xyz, s_vm[1].xyz, s_vm[2].xyz);
-
-	var s_var = s_vm_xyz * transpose(s_vm_xyz);
-	var s_var_xy = mat2x2f(s_var[0].xy, s_var[1].xy);
-
-	var s_var_proj = var_to_trans(s_var_xy);
-
-
-	//var vertex_pos = s_vm * vec4f(vertex.position * s, 0.0, 1.0);
-	//var v_offset = vec4f(s_vm_xyz * vec3f(vertex.position * s, 0.0), 0.0);
-	//var v_offset = vec4f(s_var_proj * vertex.position * s, 0.0, 0.0);
-	var v_offset = vec4f(vertex.position * s, 0.0, 0.0);
-	var v_pos = s_center + v_offset;
-
+	var center = wt * vec4f(position, 1.0);
+	var z = center.z;
+	var pos2d = transpose(v) * vertex.position;
+	var pos = vec4f(pos2d*s, 0.0, 0.0);
+	//pos.x *= variance[0][0];
+	//pos.y *= variance[1][1];
+	//pos.z *= variance[2][2];
+	pos = pos + center;
+	//center = uniforms.projectionMatrix * center;
+	//pos = uniforms.projectionMatrix * pos;
+	//pos.w = 0.0;
+	//out.position =  pos + center;
 	var out: VertexOutput; // create the output struct
-	out.position = uniforms.projectionMatrix * v_pos;
+	out.position = uniforms.projectionMatrix * pos;
 	out.color = instance.color; 
     out.uv = vertex.uv;
 	return out;
@@ -133,6 +116,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	dist = sqrt(dist);
 	var falloff = exp(- 0.5*dist * dist);
 	var color = vec4f(in.color.xyz, in.color.w * falloff);
-	//color = vec4f(in.color.xyz, 1);
+	color = vec4f(in.color.xyz, 1);
 	return color; // use the interpolated color coming from the vertex shader
 }

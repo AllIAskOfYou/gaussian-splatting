@@ -52,7 +52,7 @@ private:
 		glm::mat4x4 viewMatrix;
 		glm::mat4x4 modelMatrix;
 		glm::vec3 _pad;
-		float splatSize=0.01;
+		float splatSize=0.03;//4.0;
 	};
 
 	struct Quad {
@@ -720,8 +720,64 @@ RequiredLimits Application::GetRequiredLimits(Adapter adapter) const {
 }
 
 void Application::InitializeBuffers() {
+	
+	
+	// add a single splat at the origin
+	std::vector<Splat> splats(0);
+	glm::vec3 position = glm::vec3(1.0f, 0.0f, 0.0f);
+	glm::vec3 scale = glm::vec3(2, 0.5, 1);
+	glm::vec4 color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+	glm::vec4 rotation = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
 
+	
+	//glm::mat3 rotationMatrix = glm::mat3(0.0f);
+	//float cnst = glm::sqrt(2.0f) / 2.0f;
+	//rotationMatrix[0] = glm::vec3(cnst, 0.0f, -cnst);
+	//rotationMatrix[1] = glm::vec3(0.0f, 1.0f, 0.0f);
+	//rotationMatrix[2] = glm::vec3(cnst, 0.0f, cnst);
+	//rotationMatrix = glm::mat3(1.0f);
+
+	//rotationMatrix = glm::mat3(glm::rotate(glm::mat4(rotationMatrix), glm::radians(45.0f), glm::vec3(1.0f, 0.0f, 0.0f)));
+
+	glm::mat3 scaleMatrix (1.0f);
+	scaleMatrix[0][0] = scale.x;
+	scaleMatrix[1][1] = scale.y;
+	scaleMatrix[2][2] = scale.z;
+
+	//glm::mat3 variance = rotationMatrix * scaleMatrix;
+	//glm::f32 constant = 2 * glm::pi<float>() * glm::sqrt(glm::determinant(variance));
+
+	Splat s;
+	//s.position = glm::vec4(position, constant);
+	//s.variance = glm::mat4(variance);
+	s.color = color;
+
+	Splat s2;
+	//s2.position = glm::vec4(glm::vec3(0.0f, 0.0f, 0.0f), constant);
+	//s2.variance = glm::mat4(variance);
+	s2.color = glm::vec4(color);
+
+	//splats[0] = s;
+	//splats[1] = s2;
+
+	for (int i = 0; i < 6; i++) {
+		Splat s;
+		glm::mat3 rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i, glm::vec3(1.0f, 0.0f, 0.0f)));
+		rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i, glm::vec3(0.0f, 1.0f, 0.0f))) * rotationMatrix;
+		glm::mat3 variance = rotationMatrix * scaleMatrix;
+		s.transform = glm::mat4(variance); //glm::rotate(glm::mat4(scaleMatrix), glm::radians(30.0f)*i, glm::vec3(0.0f, 1.0f, 0.0f));
+		s.transform[3] = glm::vec4(glm::vec3(0.5f*i, 0.0f, 0.0f), 1);
+		//s.position = glm::vec4(glm::vec3(0.1f*i, 0.0f, 0.0f), constant);
+		//s.variance = glm::mat4(variance);
+		s.color = glm::vec4(color);
+		splats.push_back(s);
+	}
+	
+	splatMesh.splatData = splats;
+	splatMesh.splatCount = splats.size();
+	
 	splatMesh.loadData(RESOURCE_DIR "/splats/nike.splat", true);
+
 	std::cout << "Loaded " << splatMesh.splatCount << " splats" << std::endl;
 
 	splatMesh.initialize(device, queue);
@@ -772,6 +828,7 @@ void Application::InitializeScene() {
 	// Create a node for the splat
 	splatNode->position = glm::vec3(0.0f, 0.0f, 0.0f);
 	splatNode->scale = glm::vec3(1.0f, 1.0f, 1.0f);
+	//splatNode->rotate(glm::vec3(0.0f, 1.0f, 0.0f), glm::radians(90.0f));
 	scene->addChild(splatNode);
 	std::cout << "Scene initialized" << std::endl;
 };
@@ -835,7 +892,7 @@ void Application::updateGui(RenderPassEncoder renderPass) {
 		ImGui::TableNextRow();
 		ImGui::TableNextRow();
 
-		guiAddSliderParameter("size", &uniforms.splatSize, 0.001f, 0.1f);
+		guiAddSliderParameter("size", &uniforms.splatSize, 0.001f, 6.0f);
 
 		ImGui::EndTable();
 	}

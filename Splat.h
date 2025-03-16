@@ -10,10 +10,18 @@ struct SplatRaw {
 };
 
 struct Splat {
+	glm::mat4 transform;
 	glm::vec4 color;
-	glm::vec4 rotation;
-	glm::vec3 position;
-	glm::f32 _pad1;
-	glm::vec3 scale;
-	glm::f32 _pad2;
 };
+
+/*
+struct Splat {
+	glm::mat3 variance; 		// 3 x 12 bytes
+	glm::vec3 _pad1;			// 1 x 12 bytes
+	glm::vec4 color; 			// 1 x 16 bytes
+	glm::vec3 position;			// 1 x 12 bytes
+	glm::f32 _pad2;				// 1 x 4 bytes
+	glm::f32 constant;			// 1 x 4 bytes
+	glm::f32 _pad3[3];			// 3 x 4 bytes
+};
+*/

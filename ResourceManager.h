@@ -4,6 +4,12 @@
 #include <webgpu/webgpu.hpp>
 #include "Splat.h"
 
+#include <glm/glm.hpp>
+#include <glm/ext.hpp>
+#include <fstream>
+#include <sstream>
+#include <string>
+
 class ResourceManager {
 public:
 	/**

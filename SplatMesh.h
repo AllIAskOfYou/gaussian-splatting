@@ -74,11 +74,12 @@ public:
     void sortSplats(glm::vec3 cameraPos) {
         // measure the time needed to sort the splats
 
-        //auto start = std::chrono::high_resolution_clock::now();
+        auto start = std::chrono::high_resolution_clock::now();
 
         std::vector<float> distances(splatCount);
         for (uint32_t i = 0; i < splatCount; i++) {
-            distances[i] = glm::distance(splatData[i].position, cameraPos);
+            glm::vec3 position = glm::vec3(splatData[i].transform[3]);
+            distances[i] = glm::distance(position, cameraPos);
         }
 
 
@@ -93,9 +94,9 @@ public:
     #endif
         
 
-        //auto end = std::chrono::high_resolution_clock::now();
-        //std::chrono::duration<double> elapsed = end - start;
-        //std::cout << "Time needed to sort the splats: " << elapsed.count() << "s" << std::endl;
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+        std::cout << "Time needed to sort the splats: " << elapsed.count() << "s" << std::endl;
 
         queue.writeBuffer(sortIndexBuffer, 0, sortIndices.data(), splatCount * sizeof(uint32_t));
     }
@@ -145,33 +146,61 @@ private:
     }
 
     void initializeIndexQuadBuffer() {
-        BufferDescriptor bufferDesc;
-        bufferDesc.size = 6 * sizeof(uint16_t);
-        bufferDesc.usage = BufferUsage::CopyDst | BufferUsage::Index;
-        indexQuadBuffer = device.createBuffer(bufferDesc);
+         // make indices for unit cube
+        //std::vector<uint16_t> indexQuadData = {
+        //    0, 1, 2, 0, 2, 3,
+        //    4, 5, 6, 4, 6, 7,
+        //    0, 4, 5, 0, 5, 1,
+        //    1, 5, 6, 1, 6, 2,
+        //    2, 6, 7, 2, 7, 3,
+        //    3, 7, 4, 3, 4, 0
+        //};
 
+        
         std::vector<uint16_t> indexQuadData = {
             0, 1, 2, 0, 2, 3
         };
+
+        BufferDescriptor bufferDesc;
+        bufferDesc.size = indexQuadData.size() * sizeof(uint16_t);
+        bufferDesc.usage = BufferUsage::CopyDst | BufferUsage::Index;
+        indexQuadBuffer = device.createBuffer(bufferDesc);
+
+
+
+       
 
         queue.writeBuffer(indexQuadBuffer, 0, indexQuadData.data(), bufferDesc.size);
     }
 
     void initializeQuadBuffer() {
-        BufferDescriptor bufferDesc;
-        bufferDesc.size = 4 * sizeof(Quad);
-        bufferDesc.usage = BufferUsage::CopyDst | BufferUsage::Vertex;
-        quadBuffer = device.createBuffer(bufferDesc);
-
-        Quad quadData[4] = {
+        std::vector<Quad> quadData = {
             { glm::vec2(-1.0f, -1.0f), glm::vec2(0.0f, 0.0f) },
             { glm::vec2(1.0f, -1.0f), glm::vec2(1.0f, 0.0f) },
             { glm::vec2(1.0f, 1.0f), glm::vec2(1.0f, 1.0f) },
             { glm::vec2(-1.0f, 1.0f), glm::vec2(0.0f, 1.0f) }
         };
 
+        // make vertices for unit cube
+        //std::vector<Quad> quadData = {
+        //    { glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 0.0f) },
+        //    { glm::vec3(1.0f, -1.0f, -1.0f), glm::vec2(1.0f, 0.0f) },
+        //    { glm::vec3(1.0f, 1.0f, -1.0f), glm::vec2(1.0f, 1.0f) },
+        //    { glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec2(0.0f, 1.0f) },
+        //    { glm::vec3(-1.0f, -1.0f, 1.0f), glm::vec2(0.0f, 0.0f) },
+        //    { glm::vec3(1.0f, -1.0f, 1.0f), glm::vec2(1.0f, 0.0f) },
+        //    { glm::vec3(1.0f, 1.0f, 1.0f), glm::vec2(1.0f, 1.0f) },
+        //    { glm::vec3(-1.0f, 1.0f, 1.0f), glm::vec2(0.0f, 1.0f) }
+        //};
+
+        
+        BufferDescriptor bufferDesc;
+        bufferDesc.size = quadData.size() * sizeof(Quad);
+        bufferDesc.usage = BufferUsage::CopyDst | BufferUsage::Vertex;
+        quadBuffer = device.createBuffer(bufferDesc);
+
         // Copy the quad data to the buffer
-        queue.writeBuffer(quadBuffer, 0, quadData, bufferDesc.size);
+        queue.writeBuffer(quadBuffer, 0, quadData.data(), bufferDesc.size);
     }
 
     void initializeQuadBufferLayout() {
@@ -179,7 +208,7 @@ private:
 
         // Describe the position attribute
         quadAttribs[0].shaderLocation = 0; // @location(4)
-        quadAttribs[0].format = VertexFormat::Float32x2;
+        quadAttribs[0].format = VertexFormat::Float32x3;
         quadAttribs[0].offset = 0;
 
         // Describe the uv attribute
