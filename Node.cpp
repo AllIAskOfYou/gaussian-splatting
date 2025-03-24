@@ -19,9 +19,11 @@ void Node::updateWorldMatrix(const glm::mat4& parentWorldMatrix) {
 }
 
 void Node::updateLocalMatrix() {
-    localMatrix = glm::translate(glm::mat4(1.0f), position) *
-                    glm::scale(glm::mat4(1.0f), scale) *
-                    glm::mat4(rotation);
+    localMatrix = glm::mat4(1.0f);
+    localMatrix = glm::scale(localMatrix, scale);
+    localMatrix = glm::mat4(rotation) * localMatrix;
+    localMatrix[3] = glm::vec4(position, 1.0f);
+    //localMatrix = glm::translate(localMatrix, position);
 }
 
 void Node::rotate(glm::vec3 axis, float angle) {

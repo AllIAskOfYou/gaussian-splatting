@@ -5,8 +5,9 @@ struct Uniforms {
     projectionMatrix: mat4x4f,
     viewMatrix: mat4x4f,
     modelMatrix: mat4x4f,
-	_pad1: vec3f,
 	splatSize: f32,
+	rot1: f32,
+	rot2: f32,
 };
 
 struct Splat {
@@ -43,6 +44,22 @@ struct VertexOutput {
     @location(1) uv: vec2f,
 };
 
+/*
+fn eigenvectors(a: mat2x2<f32>) -> mat2x2<f32> {
+    let a11 = a[0][0];
+    let a22 = a[1][1];
+    let a1221 = a[0][1] * a[1][0];
+    let det = sqrt(a11*a11 + 4 * a1221 - 2 * a11*a22 + a22*a22);
+    let lam1 = 0.5 * (a11 + a22 + det);
+    let lam2 = 0.5 * (a11 + a22 - det);
+    let phi = 0.5 * atan2(2 * a[0][1], a11 - a22);
+    return mat2x2f(
+        vec2f(cos(phi), sin(phi)) * sqrt(lam1),
+        vec2f(-sin(phi), cos(phi)) * sqrt(lam2)
+    );
+}
+*/
+
 fn var_to_trans(mat: mat2x2f) -> mat2x2f {
 	var a = mat[0][0];
 	var b = mat[1][0];
@@ -55,28 +72,20 @@ fn var_to_trans(mat: mat2x2f) -> mat2x2f {
 	var lambda2 = (trace - sqrt_term) / 2.0;
 	var v1: vec2f;
 	var v2: vec2f;
-	let err = 1e-6;
+	let err = 1e-8;
 	if (abs(b) < err && abs(c) < err) {
 		v1 = vec2f(1.0, 0.0);
 		v2 = vec2f(0.0, 1.0);
 	} else if (abs(b) < err) {
 		v1 = vec2f(lambda1 - d, c);
-		v2 = vec2f(lambda2 - d, c);
+		v2 = vec2f(c, d - lambda1);
 	} else {
 		v1 = vec2f(b, lambda1 - a);
-		v2 = vec2f(b, lambda2 - a);
+		v2 = vec2f(a - lambda1, b);
 	}
 		
 	v1 = normalize(v1);
 	v2 = normalize(v2);
-
-	if (v1.x < 0.0) {
-		v1 = -v1;
-	}
-	if (v2.x < 0.0) {
-		v2 = -v2;
-	}
-
 	var trans = mat2x2f(sqrt(lambda1) * v1, sqrt(lambda2) * v2);
 	return trans;
 }
@@ -92,18 +101,19 @@ fn vs_main(@builtin(instance_index) instanceIndex: u32, vertex: VertexInput) -> 
 	var sm = instance.transform;
 	var s_vm = wt * sm;
 	var s_center = s_vm[3];
-	var z = s_center.z;
-	var d = 1.0 / max(1e-6, z);
+	//var z = s_center.z;
+	//var d = 1.0 / max(1e-6, z);
 	var s_vm_xyz = mat3x3f(s_vm[0].xyz, s_vm[1].xyz, s_vm[2].xyz);
 
 	var s_var = s_vm_xyz * transpose(s_vm_xyz);
 	var s_var_xy = mat2x2f(s_var[0].xy, s_var[1].xy);
 
 	var s_var_proj = var_to_trans(s_var_xy);
+	//var s_var_proj = eigenvectors(s_var_xy);
 
 
-	//var v_offset = vec4f(s_var_proj * vertex.position * s, 0.0, 0.0);		->		// Uncomment for non-uniform splats
-	var v_offset = vec4f(vertex.position * s, 0.0, 0.0);							// Comment for non-uniform splats
+	var v_offset = vec4f(s_var_proj * vertex.position * s, 0.0, 0.0);				// Uncomment for non-uniform splats
+	//var v_offset = vec4f(vertex.position * s, 0.0, 0.0);							// Comment for non-uniform splats
 	var v_pos = s_center + v_offset;
 
 	var out: VertexOutput; // create the output struct

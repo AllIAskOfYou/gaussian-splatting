@@ -51,8 +51,10 @@ private:
 		glm::mat4x4 projectionMatrix;
 		glm::mat4x4 viewMatrix;
 		glm::mat4x4 modelMatrix;
-		glm::vec3 _pad;
 		float splatSize=0.03;//4.0;
+		float rot_1 = 0.0;
+		float rot_2 = 0.0;
+		float rot_3 = 0.0;
 	};
 
 	struct Quad {
@@ -305,6 +307,41 @@ void Application::MainLoop() {
 
 	// Update the scene
 	UpdateScene();
+	/*
+	// -----------------------------------------------------------------------------------
+	// add a single splat at the origin
+	std::vector<Splat> splats(0);
+	glm::vec3 scale = glm::vec3(1, 0.5, 1);
+
+	glm::mat3 scaleMatrix (1.0f);
+	scaleMatrix[0][0] = scale.x;
+	scaleMatrix[1][1] = scale.y;
+	scaleMatrix[2][2] = scale.z;
+
+	glm::vec4 color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+
+	//splats[0] = s;
+	//splats[1] = s2;
+
+	for (int i = 0; i < 10; i++) {
+		Splat s;
+		glm::mat3 rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*uniforms.rot_1, glm::vec3(1.0f, 0.0f, 0.0f)));
+		rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*uniforms.rot_2, glm::vec3(0.0f, 1.0f, 0.0f))) * rotationMatrix;
+		rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*uniforms.rot_3, glm::vec3(0.0f, 0.0f, 1.0f))) * rotationMatrix;
+		glm::mat3 variance = rotationMatrix * scaleMatrix;
+		s.transform = glm::mat4(variance); //glm::rotate(glm::mat4(scaleMatrix), glm::radians(30.0f)*i, glm::vec3(0.0f, 1.0f, 0.0f));
+		s.transform[3] = glm::vec4(glm::vec3(0.5f*i, 0.0f, 0.0f), 1);
+		//s.position = glm::vec4(glm::vec3(0.1f*i, 0.0f, 0.0f), constant);
+		//s.variance = glm::mat4(variance);
+		s.color = color;
+		splats.push_back(s);
+	}
+	
+	splatMesh.splatData = splats;
+	splatMesh.splatCount = splats.size();
+	queue.writeBuffer(splatMesh.splatBuffer, 0, splatMesh.splatData.data(), splatMesh.splatData.size() * sizeof(Splat));
+	// -----------------------------------------------------------------------------------
+	*/
 
 	// Create a transform matrix
 	uniforms.projectionMatrix = camera->getProjectionMatrix();
@@ -315,7 +352,7 @@ void Application::MainLoop() {
 	queue.writeBuffer(transformBuffer, 0, &uniforms, sizeof(Uniforms));
 
 	// Sort the splats
-	glm::vec3 cameraPos = glm::vec3(camera->worldMatrix * glm::vec4(camera->position, 1.0f));
+	glm::vec3 cameraPos = glm::vec3(camera->worldMatrix[3]);
 	splatMesh.sortSplats(cameraPos);
 
 	// Get the next target texture view
@@ -427,156 +464,6 @@ RenderPassEncoder Application::createRenderPassEncoder(TextureView &targetView, 
 	RenderPassEncoder renderPass = encoder.beginRenderPass(renderPassDesc);
 	return renderPass;
 }
-
-/*
-void Application::InitializePipeline() {
-	std::cout << "Creating shader module..." << std::endl;
-	ShaderModule shaderModule = ResourceManager::loadShaderModule(RESOURCE_DIR "/shader.wgsl", device);
-	std::cout << "Shader module: " << shaderModule << std::endl;
-
-	// Check for errors
-	if (shaderModule == nullptr) {
-		std::cerr << "Could not load shader!" << std::endl;
-		exit(1);
-	}
-
-	// Create the render pipeline
-	RenderPipelineDescriptor pipelineDesc;
-
-	// Configure the vertex pipeline
-	// We use one vertex buffer
-	VertexBufferLayout vertexBufferLayout;
-	// We now have 2 attributes
-	std::vector<VertexAttribute> vertexAttribs(4);
-	
-	// Describe the position attribute
-	vertexAttribs[0].shaderLocation = 0; // @location(0)
-	vertexAttribs[0].format = VertexFormat::Float32x3;
-	vertexAttribs[0].offset = 0;
-
-	// Describe the size attribute
-	vertexAttribs[1].shaderLocation = 1; // @location(1)
-	vertexAttribs[1].format = VertexFormat::Float32x3; // different type!
-	vertexAttribs[1].offset = 3 * sizeof(float); // non null offset!
-
-	
-	// Describe the color attribute
-	vertexAttribs[2].shaderLocation = 2; // @location(2)
-	vertexAttribs[2].format = VertexFormat::Float32x4; // different type!
-	vertexAttribs[2].offset = 6 * sizeof(float); // non null offset!
-
-	// Describe the rotation attribute
-	vertexAttribs[3].shaderLocation = 3; // @location(2)
-	vertexAttribs[3].format = VertexFormat::Float32x4; // different type!
-	vertexAttribs[3].offset = 10 * sizeof(float); // non null offset!
-	
-	vertexBufferLayout.attributeCount = static_cast<uint32_t>(vertexAttribs.size());
-	vertexBufferLayout.attributes = vertexAttribs.data();
-	
-	vertexBufferLayout.arrayStride = sizeof(Splat);
-	std::cout << "Splat size: " << sizeof(Splat) << std::endl;
-	//                               ^^^^^^^^^^^^^^^^^ The new stride
-	vertexBufferLayout.stepMode = VertexStepMode::Vertex;
-	
-	pipelineDesc.vertex.bufferCount = 1;
-	pipelineDesc.vertex.buffers = &vertexBufferLayout;
-
-	// NB: We define the 'shaderModule' in the second part of this chapter.
-	// Here we tell that the programmable vertex shader stage is described
-	// by the function called 'vs_main' in that module.
-	pipelineDesc.vertex.module = shaderModule;
-	pipelineDesc.vertex.entryPoint = "vs_main";
-	pipelineDesc.vertex.constantCount = 0;
-	pipelineDesc.vertex.constants = nullptr;
-
-	// Each sequence of 3 vertices is considered as a triangle
-	pipelineDesc.primitive.topology = PrimitiveTopology::PointList;
-	
-	// We'll see later how to specify the order in which vertices should be
-	// connected. When not specified, vertices are considered sequentially.
-	pipelineDesc.primitive.stripIndexFormat = IndexFormat::Undefined;
-	
-	// The face orientation is defined by assuming that when looking
-	// from the front of the face, its corner vertices are enumerated
-	// in the counter-clockwise (CCW) order.
-	
-	// pipelineDesc.primitive.frontFace = FrontFace::CCW;
-	
-	// But the face orientation does not matter much because we do not
-	// cull (i.e. "hide") the faces pointing away from us (which is often
-	// used for optimization).
-	
-	// pipelineDesc.primitive.cullMode = CullMode::None;
-
-	// We tell that the programmable fragment shader stage is described
-	// by the function called 'fs_main' in the shader module.
-	FragmentState fragmentState;
-	fragmentState.module = shaderModule;
-	fragmentState.entryPoint = "fs_main";
-	fragmentState.constantCount = 0;
-	fragmentState.constants = nullptr;
-
-	BlendState blendState;
-	blendState.color.srcFactor = BlendFactor::SrcAlpha;
-	blendState.color.dstFactor = BlendFactor::OneMinusSrcAlpha;
-	blendState.color.operation = BlendOperation::Add;
-	blendState.alpha.srcFactor = BlendFactor::Zero;
-	blendState.alpha.dstFactor = BlendFactor::One;
-	blendState.alpha.operation = BlendOperation::Add;
-	
-	ColorTargetState colorTarget;
-	colorTarget.format = surfaceFormat;
-	colorTarget.blend = &blendState;
-	colorTarget.writeMask = ColorWriteMask::All; // We could write to only some of the color channels.
-	
-	// We have only one target because our render pass has only one output color
-	// attachment.
-	fragmentState.targetCount = 1;
-	fragmentState.targets = &colorTarget;
-	pipelineDesc.fragment = &fragmentState;
-
-	// We do not use stencil/depth testing for now
-	pipelineDesc.depthStencil = nullptr;
-
-	// Samples per pixel
-	pipelineDesc.multisample.count = 1;
-
-	// Default value for the mask, meaning "all bits on"
-	pipelineDesc.multisample.mask = ~0u;
-
-	// Default value as well (irrelevant for count = 1 anyways)
-	pipelineDesc.multisample.alphaToCoverageEnabled = false;
-
-	// Define binding layout (don't forget to = Default)
-	BindGroupLayoutEntry bindingLayout = Default;
-	// The binding index as used in the @binding attribute in the shader
-	bindingLayout.binding = 0;
-	// The stage that needs to access this resource
-	bindingLayout.visibility = ShaderStage::Vertex;
-	bindingLayout.buffer.type = BufferBindingType::Uniform;
-	bindingLayout.buffer.minBindingSize = sizeof(Uniforms);
-
-	// Create a bind group layout
-	BindGroupLayoutDescriptor bindGroupLayoutDesc{};
-	bindGroupLayoutDesc.entryCount = 1;
-	bindGroupLayoutDesc.entries = &bindingLayout;
-	bindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
-
-	// Create the pipeline layout
-	PipelineLayoutDescriptor layoutDesc{};
-	layoutDesc.bindGroupLayoutCount = 1;
-	layoutDesc.bindGroupLayouts = (WGPUBindGroupLayout*)&bindGroupLayout;
-	layout = device.createPipelineLayout(layoutDesc);
-
-
-	pipelineDesc.layout = layout;
-	
-	pipeline = device.createRenderPipeline(pipelineDesc);
-
-	// We no longer need to access the shader module
-	shaderModule.release();
-}
-*/
 
 void Application::InitializePipeline() {
 	std::cout << "Creating shader module..." << std::endl;
@@ -724,52 +611,28 @@ void Application::InitializeBuffers() {
 	
 	// add a single splat at the origin
 	std::vector<Splat> splats(0);
-	glm::vec3 position = glm::vec3(1.0f, 0.0f, 0.0f);
-	glm::vec3 scale = glm::vec3(2, 0.5, 1);
-	glm::vec4 color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
-	glm::vec4 rotation = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
-
-	
-	//glm::mat3 rotationMatrix = glm::mat3(0.0f);
-	//float cnst = glm::sqrt(2.0f) / 2.0f;
-	//rotationMatrix[0] = glm::vec3(cnst, 0.0f, -cnst);
-	//rotationMatrix[1] = glm::vec3(0.0f, 1.0f, 0.0f);
-	//rotationMatrix[2] = glm::vec3(cnst, 0.0f, cnst);
-	//rotationMatrix = glm::mat3(1.0f);
-
-	//rotationMatrix = glm::mat3(glm::rotate(glm::mat4(rotationMatrix), glm::radians(45.0f), glm::vec3(1.0f, 0.0f, 0.0f)));
+	glm::vec3 scale = glm::vec3(1, 0.5, 1);
 
 	glm::mat3 scaleMatrix (1.0f);
 	scaleMatrix[0][0] = scale.x;
 	scaleMatrix[1][1] = scale.y;
 	scaleMatrix[2][2] = scale.z;
 
-	//glm::mat3 variance = rotationMatrix * scaleMatrix;
-	//glm::f32 constant = 2 * glm::pi<float>() * glm::sqrt(glm::determinant(variance));
-
-	Splat s;
-	//s.position = glm::vec4(position, constant);
-	//s.variance = glm::mat4(variance);
-	s.color = color;
-
-	Splat s2;
-	//s2.position = glm::vec4(glm::vec3(0.0f, 0.0f, 0.0f), constant);
-	//s2.variance = glm::mat4(variance);
-	s2.color = glm::vec4(color);
+	glm::vec4 color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
 
 	//splats[0] = s;
 	//splats[1] = s2;
 
-	for (int i = 0; i < 6; i++) {
+	for (int i = 0; i < 10; i++) {
 		Splat s;
-		glm::mat3 rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i, glm::vec3(1.0f, 0.0f, 0.0f)));
-		rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i, glm::vec3(0.0f, 1.0f, 0.0f))) * rotationMatrix;
+		glm::mat3 rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*uniforms.rot_1, glm::vec3(1.0f, 0.0f, 0.0f)));
+		rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*uniforms.rot_2, glm::vec3(0.0f, 1.0f, 0.0f))) * rotationMatrix;
 		glm::mat3 variance = rotationMatrix * scaleMatrix;
 		s.transform = glm::mat4(variance); //glm::rotate(glm::mat4(scaleMatrix), glm::radians(30.0f)*i, glm::vec3(0.0f, 1.0f, 0.0f));
 		s.transform[3] = glm::vec4(glm::vec3(0.5f*i, 0.0f, 0.0f), 1);
 		//s.position = glm::vec4(glm::vec3(0.1f*i, 0.0f, 0.0f), constant);
 		//s.variance = glm::mat4(variance);
-		s.color = glm::vec4(color);
+		s.color = color;
 		splats.push_back(s);
 	}
 	
@@ -893,6 +756,10 @@ void Application::updateGui(RenderPassEncoder renderPass) {
 		ImGui::TableNextRow();
 
 		guiAddSliderParameter("size", &uniforms.splatSize, 0.001f, 6.0f);
+
+		guiAddSliderParameter("rot_1", &uniforms.rot_1, 0.0f, 2.0f);
+		guiAddSliderParameter("rot_2", &uniforms.rot_2, 0.0f, 2.0f);
+		guiAddSliderParameter("rot_3", &uniforms.rot_3, 0.0f, 2.0f);
 
 		ImGui::EndTable();
 	}
