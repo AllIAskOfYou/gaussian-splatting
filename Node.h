@@ -28,7 +28,6 @@ public:
         localMatrix(1.0f),
         worldMatrix(1.0f) {}
 
-
 public:
     void addChild(std::shared_ptr<Node> child);
     void rotate(glm::vec3 axis, float angle);

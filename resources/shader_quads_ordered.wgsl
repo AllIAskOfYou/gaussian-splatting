@@ -1,13 +1,9 @@
-/**
- * A structure for the uniforms
- */
 struct Uniforms {
     projectionMatrix: mat4x4f,
     viewMatrix: mat4x4f,
     modelMatrix: mat4x4f,
 	splatSize: f32,
-	rot1: f32,
-	rot2: f32,
+	fov: f32,
 };
 
 struct Splat {
@@ -19,21 +15,11 @@ struct Splat {
 @group(0) @binding(1) var<storage, read> splats: array<Splat>;
 @group(0) @binding(2) var<storage, read> sortedIndex: array<u32>;
 
-/**
- * A structure with fields labeled with vertex attribute locations can be used
- * as input to the entry point of a shader.
- */
-
 struct VertexInput {
     @location(0) position: vec2f,
     @location(1) uv: vec2f,
 };
 
-/**
- * A structure with fields labeled with builtins and locations can also be used
- * as *output* of the vertex shader, which is also the input of the fragment
- * shader.
- */
 struct VertexOutput {
 	@builtin(position) position: vec4f,
 	// The location here does not refer to a vertex attribute, it just means
@@ -42,9 +28,9 @@ struct VertexOutput {
 	// as input to the fragment shader.)
 	@location(0) color: vec4f,
     @location(1) uv: vec2f,
+	@location(2) det: f32,
 };
 
-/*
 fn eigenvectors(a: mat2x2<f32>) -> mat2x2<f32> {
     let a11 = a[0][0];
     let a22 = a[1][1];
@@ -58,37 +44,6 @@ fn eigenvectors(a: mat2x2<f32>) -> mat2x2<f32> {
         vec2f(-sin(phi), cos(phi)) * sqrt(lam2)
     );
 }
-*/
-
-fn var_to_trans(mat: mat2x2f) -> mat2x2f {
-	var a = mat[0][0];
-	var b = mat[1][0];
-	var c = mat[0][1];
-	var d = mat[1][1];
-	var trace = a + d;
-	var det = a * d - b * c;
-	var sqrt_term = sqrt(max(0.0f, trace * trace - 4.0 * det));
-	var lambda1 = (trace + sqrt_term) / 2.0;
-	var lambda2 = (trace - sqrt_term) / 2.0;
-	var v1: vec2f;
-	var v2: vec2f;
-	let err = 1e-8;
-	if (abs(b) < err && abs(c) < err) {
-		v1 = vec2f(1.0, 0.0);
-		v2 = vec2f(0.0, 1.0);
-	} else if (abs(b) < err) {
-		v1 = vec2f(lambda1 - d, c);
-		v2 = vec2f(c, d - lambda1);
-	} else {
-		v1 = vec2f(b, lambda1 - a);
-		v2 = vec2f(a - lambda1, b);
-	}
-		
-	v1 = normalize(v1);
-	v2 = normalize(v2);
-	var trans = mat2x2f(sqrt(lambda1) * v1, sqrt(lambda2) * v2);
-	return trans;
-}
 
 @vertex
 fn vs_main(@builtin(instance_index) instanceIndex: u32, vertex: VertexInput) -> VertexOutput {
@@ -96,30 +51,47 @@ fn vs_main(@builtin(instance_index) instanceIndex: u32, vertex: VertexInput) -> 
 	var vm = uniforms.viewMatrix;
 	var mm = uniforms.modelMatrix;
 	var wt = vm * mm;
+	var wt_xyz = mat3x3f(wt[0].xyz, wt[1].xyz, wt[2].xyz);
 
 	var instance = splats[sortedIndex[instanceIndex]];
 	var sm = instance.transform;
-	var s_vm = wt * sm;
-	var s_center = s_vm[3];
-	//var z = s_center.z;
-	//var d = 1.0 / max(1e-6, z);
-	var s_vm_xyz = mat3x3f(s_vm[0].xyz, s_vm[1].xyz, s_vm[2].xyz);
+	var s_center = wt * sm[3];
+	var s_rm = mat3x3f(sm[0].xyz, sm[1].xyz, sm[2].xyz);
+	//s_rm[0][1] *= s;
+	//s_rm[1][1] *= s;
+	//s_rm[2][1] *= s;
 
-	var s_var = s_vm_xyz * transpose(s_vm_xyz);
-	var s_var_xy = mat2x2f(s_var[0].xy, s_var[1].xy);
+	/// Jacobi:
+	/*
+	let l = length(s_center.xyz);
+    let f = tan(uniforms.fov / 2);
+	let asp = 1.0;
+    let tz2 = s_center.z*s_center.z;
+    let jacobi = mat3x3f(
+        1.0 / s_center.z, 0.0, s_center.x / l,
+        0.0, 1.0 / s_center.z, s_center.y / l,
+        s_center.x / tz2, s_center.y / tz2, s_center.z / l
+    );
+	*/
 
-	var s_var_proj = var_to_trans(s_var_xy);
-	//var s_var_proj = eigenvectors(s_var_xy);
+	var s_wt = wt_xyz * s_rm;
+	var s_var_t = s_wt * transpose(s_wt);
+	var s_var_t_xy = mat2x2f(s_var_t[0].xy, s_var_t[1].xy);
 
+	//var s_var_proj = var_to_trans(s_var_t_xy);
+	var s_var_proj = eigenvectors(s_var_t_xy);
+
+	var det = s_var_t_xy[0][0] * s_var_t_xy[1][1] - s_var_t_xy[0][1] * s_var_t_xy[1][0];
 
 	var v_offset = vec4f(s_var_proj * vertex.position * s, 0.0, 0.0);				// Uncomment for non-uniform splats
 	//var v_offset = vec4f(vertex.position * s, 0.0, 0.0);							// Comment for non-uniform splats
 	var v_pos = s_center + v_offset;
 
 	var out: VertexOutput; // create the output struct
-	out.position = uniforms.projectionMatrix * v_pos;
+	out.position =  uniforms.projectionMatrix * v_pos;// + v_offset * v_pos.w;
 	out.color = instance.color; 
     out.uv = vertex.uv;
+	out.det = det;
 	return out;
 }
 
@@ -128,8 +100,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	var uv = in.uv * 2.0 - 1.0;
 	uv = uv * 4.0;
 	var dist = uv.x * uv.x + uv.y * uv.y;
-	dist = sqrt(dist);
-	var falloff = exp(- 0.5*dist * dist);
+	let pi = 3.14159265359;
+	var det = in.det;
+	var falloff = exp(- 0.5*dist);// * (1/(2*pi * sqrt(abs(det)))) *  * 0.001;
 	var color = vec4f(in.color.xyz, in.color.w * falloff);
 	//color = vec4f(in.color.xyz, 1);
 	return color; // use the interpolated color coming from the vertex shader

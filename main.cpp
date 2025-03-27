@@ -51,10 +51,9 @@ private:
 		glm::mat4x4 projectionMatrix;
 		glm::mat4x4 viewMatrix;
 		glm::mat4x4 modelMatrix;
-		float splatSize=0.03;//4.0;
-		float rot_1 = 0.0;
-		float rot_2 = 0.0;
-		float rot_3 = 0.0;
+		float splatSize=3.0;//4.0;
+		float fov = 45.0;
+		float pad[2];
 	};
 
 	struct Quad {
@@ -116,6 +115,11 @@ private:
 	Uniforms uniforms;
 
 	ImGuiIO imGuiIo;
+
+	// DEBUGGING -----------------------------------------------------
+	float rot1 = 0.0f;
+	float rot2 = 0.0f;
+	float rot3 = 0.0f;
 
 
 	// time
@@ -307,11 +311,13 @@ void Application::MainLoop() {
 
 	// Update the scene
 	UpdateScene();
+	
+	
 	/*
 	// -----------------------------------------------------------------------------------
 	// add a single splat at the origin
 	std::vector<Splat> splats(0);
-	glm::vec3 scale = glm::vec3(1, 0.5, 1);
+	glm::vec3 scale = glm::vec3(2, 0.5, 1);
 
 	glm::mat3 scaleMatrix (1.0f);
 	scaleMatrix[0][0] = scale.x;
@@ -322,13 +328,13 @@ void Application::MainLoop() {
 
 	//splats[0] = s;
 	//splats[1] = s2;
-
 	for (int i = 0; i < 10; i++) {
 		Splat s;
-		glm::mat3 rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*uniforms.rot_1, glm::vec3(1.0f, 0.0f, 0.0f)));
-		rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*uniforms.rot_2, glm::vec3(0.0f, 1.0f, 0.0f))) * rotationMatrix;
-		rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*uniforms.rot_3, glm::vec3(0.0f, 0.0f, 1.0f))) * rotationMatrix;
+		glm::mat3 rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*rot1, glm::vec3(1.0f, 0.0f, 0.0f)));
+		rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*rot2, glm::vec3(0.0f, 1.0f, 0.0f))) * rotationMatrix;
+		rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*rot3, glm::vec3(0.0f, 0.0f, 1.0f))) * rotationMatrix;
 		glm::mat3 variance = rotationMatrix * scaleMatrix;
+		//variance = variance * glm::transpose(variance);
 		s.transform = glm::mat4(variance); //glm::rotate(glm::mat4(scaleMatrix), glm::radians(30.0f)*i, glm::vec3(0.0f, 1.0f, 0.0f));
 		s.transform[3] = glm::vec4(glm::vec3(0.5f*i, 0.0f, 0.0f), 1);
 		//s.position = glm::vec4(glm::vec3(0.1f*i, 0.0f, 0.0f), constant);
@@ -625,8 +631,8 @@ void Application::InitializeBuffers() {
 
 	for (int i = 0; i < 10; i++) {
 		Splat s;
-		glm::mat3 rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*uniforms.rot_1, glm::vec3(1.0f, 0.0f, 0.0f)));
-		rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*uniforms.rot_2, glm::vec3(0.0f, 1.0f, 0.0f))) * rotationMatrix;
+		glm::mat3 rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*rot1, glm::vec3(1.0f, 0.0f, 0.0f)));
+		rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*rot2, glm::vec3(0.0f, 1.0f, 0.0f))) * rotationMatrix;
 		glm::mat3 variance = rotationMatrix * scaleMatrix;
 		s.transform = glm::mat4(variance); //glm::rotate(glm::mat4(scaleMatrix), glm::radians(30.0f)*i, glm::vec3(0.0f, 1.0f, 0.0f));
 		s.transform[3] = glm::vec4(glm::vec3(0.5f*i, 0.0f, 0.0f), 1);
@@ -686,6 +692,7 @@ void Application::InitializeScene() {
 
 	camera = orbitCamera->camera;
 	camera->aspect = 640 / 640;
+	//orbitCamera->position = glm::vec3(0.0f, 0.0f, 5.0f);
 	scene->addChild(orbitCamera);
 
 	// Create a node for the splat
@@ -698,6 +705,7 @@ void Application::InitializeScene() {
 
 void Application::UpdateScene() {
 	scene->updateWorldMatrix(glm::mat4(1.0f));
+	camera->fov = uniforms.fov;
 };
 	
 bool Application::initGui() {
@@ -755,16 +763,28 @@ void Application::updateGui(RenderPassEncoder renderPass) {
 		ImGui::TableNextRow();
 		ImGui::TableNextRow();
 
-		guiAddSliderParameter("size", &uniforms.splatSize, 0.001f, 6.0f);
+		guiAddSliderParameter("size", &uniforms.splatSize, 0.001f, 3.0f);
 
-		guiAddSliderParameter("rot_1", &uniforms.rot_1, 0.0f, 2.0f);
-		guiAddSliderParameter("rot_2", &uniforms.rot_2, 0.0f, 2.0f);
-		guiAddSliderParameter("rot_3", &uniforms.rot_3, 0.0f, 2.0f);
+		guiAddSliderParameter("rot_1", &rot1, 0.0f, 2.0f);
+		guiAddSliderParameter("rot_2", &rot2, 0.0f, 2.0f);
+		guiAddSliderParameter("rot_3", &rot3, 0.0f, 2.0f);
 
 		ImGui::EndTable();
 	}
 
 	ImGui::Text("CAMERA");
+
+	if (ImGui::BeginTable("table2", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersOuter)) {
+		ImGui::TableSetupColumn("Text", ImGuiTableColumnFlags_WidthFixed, columnWidth); // Auto stretch
+		ImGui::TableSetupColumn("Slider", ImGuiTableColumnFlags_None, 2*columnWidth); // Fixed width
+
+		ImGui::TableNextRow();
+		ImGui::TableNextRow();
+
+		guiAddSliderParameter("FoV", &(uniforms.fov), 0.01f, 100.0f);
+
+		ImGui::EndTable();
+	}
 
 	if (ImGui::BeginTable("table2", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersOuter)) {
 		ImGui::TableSetupColumn("Text", ImGuiTableColumnFlags_WidthFixed, columnWidth); // Auto stretch
