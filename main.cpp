@@ -51,7 +51,7 @@ private:
 		glm::mat4x4 projectionMatrix;
 		glm::mat4x4 viewMatrix;
 		glm::mat4x4 modelMatrix;
-		float splatSize=3.0;//4.0;
+		float splatSize=3.1415;//4.0;
 		float fov = 45.0;
 		float pad[2];
 	};
@@ -76,8 +76,8 @@ private:
 // Event handlers for interaction
 private:
 	void onMouseMove(double xpos, double ypos);
-    void onMouseButton(int button, int action, int mods);
-    void onScroll(double xoffset, double yoffset);
+    void onMouseButton(int button, int action, [[maybe_unused]] int mods);
+    void onScroll([[maybe_unused]] double xoffset, double yoffset);
 
 private:
     bool initGui(); // called in onInit
@@ -121,6 +121,10 @@ private:
 	float rot2 = 0.0f;
 	float rot3 = 0.0f;
 
+	// OTHER ----------------------------------------------------------
+	float width = 1200;
+	float height = 800;
+
 
 	// time
 	//double time;
@@ -160,17 +164,17 @@ void Application::onMouseMove(double xpos, double ypos) {
 	orbitCamera->onMouseMove(xpos, ypos, deltaTime);
 }
 
-void Application::onMouseButton(int button, int action, int mods) {
+void Application::onMouseButton(int button, int action, [[maybe_unused]] int mods) {
     if (imGuiIo.WantCaptureMouse) {
         // Don't rotate the camera if the mouse is already captured by an ImGui
         // interaction at this frame.
         return;
     }
-	orbitCamera->onMouseButton(button, action, mods);
+	orbitCamera->onMouseButton(button, action);
 }
 
-void Application::onScroll(double xoffset, double yoffset) {
-	orbitCamera->onScroll(xoffset, yoffset, deltaTime);
+void Application::onScroll([[maybe_unused]] double xoffset, double yoffset) {
+	orbitCamera->onScroll(yoffset, deltaTime);
 }
 
 bool Application::Initialize() {
@@ -178,7 +182,7 @@ bool Application::Initialize() {
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-	m_window = glfwCreateWindow(640, 640, "Learn WebGPU", nullptr, nullptr);
+	m_window = glfwCreateWindow(width, height, "Learn WebGPU", nullptr, nullptr);
 
 	glfwSetWindowUserPointer(m_window, this);
 
@@ -257,8 +261,8 @@ bool Application::Initialize() {
 	SurfaceConfiguration config = {};
 	
 	// Configuration of the textures created for the underlying swap chain
-	config.width = 640;
-	config.height = 640;
+	config.width = width;
+	config.height = height;
 	config.usage = TextureUsage::RenderAttachment;
 	
 	surfaceFormat = surfaceCapabilities.formats[0];
@@ -311,43 +315,6 @@ void Application::MainLoop() {
 
 	// Update the scene
 	UpdateScene();
-	
-	
-	/*
-	// -----------------------------------------------------------------------------------
-	// add a single splat at the origin
-	std::vector<Splat> splats(0);
-	glm::vec3 scale = glm::vec3(2, 0.5, 1);
-
-	glm::mat3 scaleMatrix (1.0f);
-	scaleMatrix[0][0] = scale.x;
-	scaleMatrix[1][1] = scale.y;
-	scaleMatrix[2][2] = scale.z;
-
-	glm::vec4 color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
-
-	//splats[0] = s;
-	//splats[1] = s2;
-	for (int i = 0; i < 10; i++) {
-		Splat s;
-		glm::mat3 rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*rot1, glm::vec3(1.0f, 0.0f, 0.0f)));
-		rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*rot2, glm::vec3(0.0f, 1.0f, 0.0f))) * rotationMatrix;
-		rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*rot3, glm::vec3(0.0f, 0.0f, 1.0f))) * rotationMatrix;
-		glm::mat3 variance = rotationMatrix * scaleMatrix;
-		//variance = variance * glm::transpose(variance);
-		s.transform = glm::mat4(variance); //glm::rotate(glm::mat4(scaleMatrix), glm::radians(30.0f)*i, glm::vec3(0.0f, 1.0f, 0.0f));
-		s.transform[3] = glm::vec4(glm::vec3(0.5f*i, 0.0f, 0.0f), 1);
-		//s.position = glm::vec4(glm::vec3(0.1f*i, 0.0f, 0.0f), constant);
-		//s.variance = glm::mat4(variance);
-		s.color = color;
-		splats.push_back(s);
-	}
-	
-	splatMesh.splatData = splats;
-	splatMesh.splatCount = splats.size();
-	queue.writeBuffer(splatMesh.splatBuffer, 0, splatMesh.splatData.data(), splatMesh.splatData.size() * sizeof(Splat));
-	// -----------------------------------------------------------------------------------
-	*/
 
 	// Create a transform matrix
 	uniforms.projectionMatrix = camera->getProjectionMatrix();
@@ -359,7 +326,7 @@ void Application::MainLoop() {
 
 	// Sort the splats
 	glm::vec3 cameraPos = glm::vec3(camera->worldMatrix[3]);
-	splatMesh.sortSplats(cameraPos);
+	//splatMesh.sortSplats(cameraPos);
 
 	// Get the next target texture view
 	TextureView targetView = GetNextSurfaceTextureView();
@@ -614,39 +581,8 @@ RequiredLimits Application::GetRequiredLimits(Adapter adapter) const {
 
 void Application::InitializeBuffers() {
 	
-	
-	// add a single splat at the origin
-	std::vector<Splat> splats(0);
-	glm::vec3 scale = glm::vec3(1, 0.5, 1);
-
-	glm::mat3 scaleMatrix (1.0f);
-	scaleMatrix[0][0] = scale.x;
-	scaleMatrix[1][1] = scale.y;
-	scaleMatrix[2][2] = scale.z;
-
-	glm::vec4 color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
-
-	//splats[0] = s;
-	//splats[1] = s2;
-
-	for (int i = 0; i < 10; i++) {
-		Splat s;
-		glm::mat3 rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*rot1, glm::vec3(1.0f, 0.0f, 0.0f)));
-		rotationMatrix = glm::mat3_cast(glm::angleAxis(glm::radians(30.0f)*i*rot2, glm::vec3(0.0f, 1.0f, 0.0f))) * rotationMatrix;
-		glm::mat3 variance = rotationMatrix * scaleMatrix;
-		s.transform = glm::mat4(variance); //glm::rotate(glm::mat4(scaleMatrix), glm::radians(30.0f)*i, glm::vec3(0.0f, 1.0f, 0.0f));
-		s.transform[3] = glm::vec4(glm::vec3(0.5f*i, 0.0f, 0.0f), 1);
-		//s.position = glm::vec4(glm::vec3(0.1f*i, 0.0f, 0.0f), constant);
-		//s.variance = glm::mat4(variance);
-		s.color = color;
-		splats.push_back(s);
-	}
-	
-	splatMesh.splatData = splats;
-	splatMesh.splatCount = splats.size();
-	
-	splatMesh.loadData(RESOURCE_DIR "/splats/nike.splat", true);
-
+	// Load the splat data
+	splatMesh.loadData(RESOURCE_DIR "/splats/plush.splat", true);
 	std::cout << "Loaded " << splatMesh.splatCount << " splats" << std::endl;
 
 	splatMesh.initialize(device, queue);
@@ -691,7 +627,7 @@ void Application::InitializeScene() {
 	std::cout << "Initializing scene..." << std::endl;
 
 	camera = orbitCamera->camera;
-	camera->aspect = 640 / 640;
+	camera->aspect = width / height;
 	//orbitCamera->position = glm::vec3(0.0f, 0.0f, 5.0f);
 	scene->addChild(orbitCamera);
 
@@ -701,6 +637,8 @@ void Application::InitializeScene() {
 	//splatNode->rotate(glm::vec3(0.0f, 1.0f, 0.0f), glm::radians(90.0f));
 	scene->addChild(splatNode);
 	std::cout << "Scene initialized" << std::endl;
+	glm::vec3 cameraPos = glm::vec3(camera->worldMatrix[3]);
+	splatMesh.sortSplats(cameraPos);
 };
 
 void Application::UpdateScene() {

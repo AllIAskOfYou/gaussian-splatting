@@ -119,9 +119,6 @@ private:
 
     void initializeVertexBufferLayouts() {
         vertexBufferLayouts.resize(1);
-        
-        // instance attributes
-        //initializeSplatBufferLayout();
 
         // Quad atributes (per vertex)
         initializeQuadBufferLayout();
@@ -145,18 +142,7 @@ private:
         sortIndexBuffer = device.createBuffer(bufferDesc);
     }
 
-    void initializeIndexQuadBuffer() {
-         // make indices for unit cube
-        //std::vector<uint16_t> indexQuadData = {
-        //    0, 1, 2, 0, 2, 3,
-        //    4, 5, 6, 4, 6, 7,
-        //    0, 4, 5, 0, 5, 1,
-        //    1, 5, 6, 1, 6, 2,
-        //    2, 6, 7, 2, 7, 3,
-        //    3, 7, 4, 3, 4, 0
-        //};
-
-        
+    void initializeIndexQuadBuffer() {        
         std::vector<uint16_t> indexQuadData = {
             0, 1, 2, 0, 2, 3
         };
@@ -165,10 +151,6 @@ private:
         bufferDesc.size = indexQuadData.size() * sizeof(uint16_t);
         bufferDesc.usage = BufferUsage::CopyDst | BufferUsage::Index;
         indexQuadBuffer = device.createBuffer(bufferDesc);
-
-
-
-       
 
         queue.writeBuffer(indexQuadBuffer, 0, indexQuadData.data(), bufferDesc.size);
     }
@@ -180,19 +162,6 @@ private:
             { glm::vec2(1.0f, 1.0f), glm::vec2(1.0f, 1.0f) },
             { glm::vec2(-1.0f, 1.0f), glm::vec2(0.0f, 1.0f) }
         };
-
-        // make vertices for unit cube
-        //std::vector<Quad> quadData = {
-        //    { glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 0.0f) },
-        //    { glm::vec3(1.0f, -1.0f, -1.0f), glm::vec2(1.0f, 0.0f) },
-        //    { glm::vec3(1.0f, 1.0f, -1.0f), glm::vec2(1.0f, 1.0f) },
-        //    { glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec2(0.0f, 1.0f) },
-        //    { glm::vec3(-1.0f, -1.0f, 1.0f), glm::vec2(0.0f, 0.0f) },
-        //    { glm::vec3(1.0f, -1.0f, 1.0f), glm::vec2(1.0f, 0.0f) },
-        //    { glm::vec3(1.0f, 1.0f, 1.0f), glm::vec2(1.0f, 1.0f) },
-        //    { glm::vec3(-1.0f, 1.0f, 1.0f), glm::vec2(0.0f, 1.0f) }
-        //};
-
         
         BufferDescriptor bufferDesc;
         bufferDesc.size = quadData.size() * sizeof(Quad);

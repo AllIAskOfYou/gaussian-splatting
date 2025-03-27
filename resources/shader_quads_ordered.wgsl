@@ -22,13 +22,8 @@ struct VertexInput {
 
 struct VertexOutput {
 	@builtin(position) position: vec4f,
-	// The location here does not refer to a vertex attribute, it just means
-	// that this field must be handled by the rasterizer.
-	// (It can also refer to another field of another struct that would be used
-	// as input to the fragment shader.)
 	@location(0) color: vec4f,
     @location(1) uv: vec2f,
-	@location(2) det: f32,
 };
 
 fn eigenvectors(a: mat2x2<f32>) -> mat2x2<f32> {
@@ -57,9 +52,6 @@ fn vs_main(@builtin(instance_index) instanceIndex: u32, vertex: VertexInput) -> 
 	var sm = instance.transform;
 	var s_center = wt * sm[3];
 	var s_rm = mat3x3f(sm[0].xyz, sm[1].xyz, sm[2].xyz);
-	//s_rm[0][1] *= s;
-	//s_rm[1][1] *= s;
-	//s_rm[2][1] *= s;
 
 	/// Jacobi:
 	/*
@@ -78,10 +70,7 @@ fn vs_main(@builtin(instance_index) instanceIndex: u32, vertex: VertexInput) -> 
 	var s_var_t = s_wt * transpose(s_wt);
 	var s_var_t_xy = mat2x2f(s_var_t[0].xy, s_var_t[1].xy);
 
-	//var s_var_proj = var_to_trans(s_var_t_xy);
 	var s_var_proj = eigenvectors(s_var_t_xy);
-
-	var det = s_var_t_xy[0][0] * s_var_t_xy[1][1] - s_var_t_xy[0][1] * s_var_t_xy[1][0];
 
 	var v_offset = vec4f(s_var_proj * vertex.position * s, 0.0, 0.0);				// Uncomment for non-uniform splats
 	//var v_offset = vec4f(vertex.position * s, 0.0, 0.0);							// Comment for non-uniform splats
@@ -91,7 +80,6 @@ fn vs_main(@builtin(instance_index) instanceIndex: u32, vertex: VertexInput) -> 
 	out.position =  uniforms.projectionMatrix * v_pos;// + v_offset * v_pos.w;
 	out.color = instance.color; 
     out.uv = vertex.uv;
-	out.det = det;
 	return out;
 }
 
@@ -100,10 +88,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	var uv = in.uv * 2.0 - 1.0;
 	uv = uv * 4.0;
 	var dist = uv.x * uv.x + uv.y * uv.y;
-	let pi = 3.14159265359;
-	var det = in.det;
-	var falloff = exp(- 0.5*dist);// * (1/(2*pi * sqrt(abs(det)))) *  * 0.001;
+	var falloff = exp(- 0.5*dist);
 	var color = vec4f(in.color.xyz, in.color.w * falloff);
-	//color = vec4f(in.color.xyz, 1);
-	return color; // use the interpolated color coming from the vertex shader
+	return color;
 }

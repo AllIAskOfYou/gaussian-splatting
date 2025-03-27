@@ -105,7 +105,7 @@ bool ResourceManager::loadSplats(
 
 		//position.y *= -1.0f;		// <----------- THIS GUY...............
 
-		color = color / 255.0f;
+		color = glm::pow(color / 255.0f, glm::vec4(2.2f, 2.2f, 2.2f, 1.0f));	// gamma correction
 		rotation = (rotation - 128.0f) / 128.0f;
 		rotation = glm::normalize(rotation);
 

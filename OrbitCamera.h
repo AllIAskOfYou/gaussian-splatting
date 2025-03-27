@@ -15,11 +15,11 @@ private:
 public:
     std::shared_ptr<Camera> camera = std::make_shared<Camera>();
 
-    float scrollRate = 10.0;
+    float scrollRate = 5.0;
     float minDistance = 0.1;
 
-    float orbitRate = 0.5;
-    float maxOrbitRate = 1;
+    float orbitRate = 0.3;
+    float maxOrbitRate = 0.5;
 
     OrbitCamera() : Node(), pressed(false) {
         children.push_back(camera);
@@ -29,14 +29,14 @@ public:
         camera->position = glm::vec3(0.0f, 0.0f, distance);
     }
 
-    void onScroll(double xoffset, double yoffset, double deltaTime) {
+    void onScroll(double yoffset, double deltaTime) {
         camera->position.z += scrollRate * yoffset * (-1) * deltaTime;
         if (camera->position.z < minDistance) {
             camera->position.z = minDistance;
         }
     }
 
-    void onMouseButton(int button, int action, int mods) {
+    void onMouseButton(int button, int action) {
         if (button == 0) {
             pressed = action == 1;
         }
