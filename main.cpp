@@ -51,14 +51,10 @@ private:
 		glm::mat4x4 projectionMatrix;
 		glm::mat4x4 viewMatrix;
 		glm::mat4x4 modelMatrix;
-		float splatSize=3.1415;//4.0;
+		float splatSize = 1;
+		float cutOff = 3.5;
 		float fov = 45.0;
-		float pad[2];
-	};
-
-	struct Quad {
-		glm::vec2 position;
-		glm::vec2 uv;
+		float pad[1];
 	};
 
 private:
@@ -580,7 +576,19 @@ RequiredLimits Application::GetRequiredLimits(Adapter adapter) const {
 }
 
 void Application::InitializeBuffers() {
+	std::vector<Splat> splats;
+	Splat s;
+	s.transform = glm::mat4(1.0f);
+	s.transform[2][2] = 5.0f;
+	s.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+
+	splats.push_back(s);
+
+	splatMesh.splatCount = 1;
+	splatMesh.splatData = splats;
 	
+
+
 	// Load the splat data
 	splatMesh.loadData(RESOURCE_DIR "/splats/plush.splat", true);
 	std::cout << "Loaded " << splatMesh.splatCount << " splats" << std::endl;
@@ -701,11 +709,8 @@ void Application::updateGui(RenderPassEncoder renderPass) {
 		ImGui::TableNextRow();
 		ImGui::TableNextRow();
 
-		guiAddSliderParameter("size", &uniforms.splatSize, 0.001f, 3.0f);
-
-		guiAddSliderParameter("rot_1", &rot1, 0.0f, 2.0f);
-		guiAddSliderParameter("rot_2", &rot2, 0.0f, 2.0f);
-		guiAddSliderParameter("rot_3", &rot3, 0.0f, 2.0f);
+		guiAddSliderParameter("Size", &uniforms.splatSize, 0.001f, 5.0f);
+		guiAddSliderParameter("Cut Off", &uniforms.cutOff, 0.001f, 5.0f);
 
 		ImGui::EndTable();
 	}

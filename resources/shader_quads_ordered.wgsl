@@ -3,6 +3,7 @@ struct Uniforms {
     viewMatrix: mat4x4f,
     modelMatrix: mat4x4f,
 	splatSize: f32,
+	cutOff: f32,
 	fov: f32,
 };
 
@@ -14,11 +15,6 @@ struct Splat {
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(0) @binding(1) var<storage, read> splats: array<Splat>;
 @group(0) @binding(2) var<storage, read> sortedIndex: array<u32>;
-
-struct VertexInput {
-    @location(0) position: vec2f,
-    @location(1) uv: vec2f,
-};
 
 struct VertexOutput {
 	@builtin(position) position: vec4f,
@@ -41,8 +37,9 @@ fn eigenvectors(a: mat2x2<f32>) -> mat2x2<f32> {
 }
 
 @vertex
-fn vs_main(@builtin(instance_index) instanceIndex: u32, vertex: VertexInput) -> VertexOutput {
+fn vs_main(@builtin(instance_index) instanceIndex: u32, @location(0) quadPosition: vec2f,) -> VertexOutput {
 	var s = uniforms.splatSize;
+	var cut_off = uniforms.cutOff;
 	var vm = uniforms.viewMatrix;
 	var mm = uniforms.modelMatrix;
 	var wt = vm * mm;
@@ -53,40 +50,26 @@ fn vs_main(@builtin(instance_index) instanceIndex: u32, vertex: VertexInput) -> 
 	var s_center = wt * sm[3];
 	var s_rm = mat3x3f(sm[0].xyz, sm[1].xyz, sm[2].xyz);
 
-	/// Jacobi:
-	/*
-	let l = length(s_center.xyz);
-    let f = tan(uniforms.fov / 2);
-	let asp = 1.0;
-    let tz2 = s_center.z*s_center.z;
-    let jacobi = mat3x3f(
-        1.0 / s_center.z, 0.0, s_center.x / l,
-        0.0, 1.0 / s_center.z, s_center.y / l,
-        s_center.x / tz2, s_center.y / tz2, s_center.z / l
-    );
-	*/
-
 	var s_wt = wt_xyz * s_rm;
 	var s_var_t = s_wt * transpose(s_wt);
 	var s_var_t_xy = mat2x2f(s_var_t[0].xy, s_var_t[1].xy);
 
 	var s_var_proj = eigenvectors(s_var_t_xy);
 
-	var v_offset = vec4f(s_var_proj * vertex.position * s, 0.0, 0.0);				// Uncomment for non-uniform splats
+	var v_offset = vec4f(s_var_proj * quadPosition * cut_off * s, 0.0, 0.0);				// Uncomment for non-uniform splats
 	//var v_offset = vec4f(vertex.position * s, 0.0, 0.0);							// Comment for non-uniform splats
 	var v_pos = s_center + v_offset;
 
 	var out: VertexOutput; // create the output struct
 	out.position =  uniforms.projectionMatrix * v_pos;// + v_offset * v_pos.w;
 	out.color = instance.color; 
-    out.uv = vertex.uv;
+    out.uv = quadPosition*cut_off;
 	return out;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-	var uv = in.uv * 2.0 - 1.0;
-	uv = uv * 4.0;
+	var uv = in.uv;
 	var dist = uv.x * uv.x + uv.y * uv.y;
 	var falloff = exp(- 0.5*dist);
 	var color = vec4f(in.color.xyz, in.color.w * falloff);

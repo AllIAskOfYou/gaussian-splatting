@@ -20,11 +20,6 @@ using namespace wgpu;
 #include <vector>
 using namespace std;
 
-struct Quad {
-    glm::vec2 position;
-	glm::vec2 uv;
-};
-
 class SplatMesh {
 public:
     std::vector<Splat> splatData;
@@ -156,15 +151,15 @@ private:
     }
 
     void initializeQuadBuffer() {
-        std::vector<Quad> quadData = {
-            { glm::vec2(-1.0f, -1.0f), glm::vec2(0.0f, 0.0f) },
-            { glm::vec2(1.0f, -1.0f), glm::vec2(1.0f, 0.0f) },
-            { glm::vec2(1.0f, 1.0f), glm::vec2(1.0f, 1.0f) },
-            { glm::vec2(-1.0f, 1.0f), glm::vec2(0.0f, 1.0f) }
+        std::vector<glm::vec2> quadData = {
+            glm::vec2(-1.0f, -1.0f),
+            glm::vec2(1.0f, -1.0f),
+            glm::vec2(1.0f, 1.0f),
+            glm::vec2(-1.0f, 1.0f)
         };
         
         BufferDescriptor bufferDesc;
-        bufferDesc.size = quadData.size() * sizeof(Quad);
+        bufferDesc.size = quadData.size() * sizeof(glm::vec2);
         bufferDesc.usage = BufferUsage::CopyDst | BufferUsage::Vertex;
         quadBuffer = device.createBuffer(bufferDesc);
 
@@ -173,21 +168,16 @@ private:
     }
 
     void initializeQuadBufferLayout() {
-        quadAttribs.resize(2);
+        quadAttribs.resize(1);
 
         // Describe the position attribute
         quadAttribs[0].shaderLocation = 0; // @location(4)
         quadAttribs[0].format = VertexFormat::Float32x3;
         quadAttribs[0].offset = 0;
 
-        // Describe the uv attribute
-        quadAttribs[1].shaderLocation = 1; // @location(5)
-        quadAttribs[1].format = VertexFormat::Float32x2;
-        quadAttribs[1].offset = 2 * sizeof(float);
-
         vertexBufferLayouts[0].attributeCount = static_cast<uint32_t>(quadAttribs.size());
         vertexBufferLayouts[0].attributes = quadAttribs.data();
-        vertexBufferLayouts[0].arrayStride = sizeof(Quad);
+        vertexBufferLayouts[0].arrayStride = sizeof(glm::vec2);
         vertexBufferLayouts[0].stepMode = VertexStepMode::Vertex;
     }
 };
