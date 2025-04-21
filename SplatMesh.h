@@ -6,9 +6,13 @@
 #include <execution>
 #include "Splat.h"
 #include "ResourceManager.h"
-#include "ska_sort.hpp"
 // include library for measuring time
 #include <chrono>
+
+// include library for parallel execution
+#include <thread>
+#include <future>
+#include <tbb/task_arena.h>
 
 
 using namespace wgpu;
@@ -38,6 +42,7 @@ public:
     Device device;
     Queue queue;
 
+    std::future<std::vector<uint32_t>> sorter;
     std::vector<uint32_t> sortIndices;
 
     void loadData(const std::string &path, bool center) {
@@ -54,10 +59,21 @@ public:
         this->queue = queue;
         initializeBuffers();
         initializeVertexBufferLayouts();
-        
         sortIndices.resize(splatCount);
         for (uint32_t i = 0; i < splatCount; i++) {
             sortIndices[i] = i;
+        }
+        //queue.writeBuffer(sortIndexBuffer, 0, sortIndices.data(), splatCount * sizeof(uint32_t)); 
+    }
+
+    void update(glm::vec3 cameraPos) {
+        if (!sorter.valid()) {
+            sorter = std::async(std::launch::async, &SplatMesh::sortSplats, this, cameraPos);
+        }
+        else if (sorter.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+            // Update the sort index buffer
+            sortIndices = sorter.get();
+            queue.writeBuffer(sortIndexBuffer, 0, sortIndices.data(), splatCount * sizeof(uint32_t)); 
         }
     }
 
@@ -66,8 +82,13 @@ public:
         renderPass.setIndexBuffer(indexQuadBuffer, IndexFormat::Uint16, 0, indexQuadBuffer.getSize());
     }
 
-    void sortSplats(glm::vec3 cameraPos) {
+    std::vector<uint32_t> sortSplats(glm::vec3 cameraPos) {
         // measure the time needed to sort the splats
+
+        std::vector<uint32_t> sort_indices(splatCount);
+        for (uint32_t i = 0; i < splatCount; i++) {
+            sort_indices[i] = sortIndices[i];
+        }
 
         auto start = std::chrono::high_resolution_clock::now();
 
@@ -78,22 +99,25 @@ public:
         }
 
 
-    #ifdef PARALLEL
-        std::sort(std::execution::par, sortIndices.begin(), sortIndices.end(), [&](uint32_t a, uint32_t b) {
+        #ifdef PARALLEL
+        tbb::task_arena arena(8);
+        arena.execute([&] {
+            std::sort(std::execution::par, sort_indices.begin(), sort_indices.end(), [&](uint32_t a, uint32_t b) {
+                return distances[a] > distances[b];
+            });
+        });
+        #else
+        std::sort(sort_indices.begin(), sort_indices.end(), [&](uint32_t a, uint32_t b) {
             return distances[a] > distances[b];
         });
-    #else
-        ska_sort(sortIndices.begin(), sortIndices.end(), [&](uint32_t a) {
-            return -distances[a];
-        });
-    #endif
+        #endif
         
 
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = end - start;
         std::cout << "Time needed to sort the splats: " << elapsed.count() << "s" << std::endl;
 
-        queue.writeBuffer(sortIndexBuffer, 0, sortIndices.data(), splatCount * sizeof(uint32_t));
+        return sort_indices;
     }
 
     ~SplatMesh() {

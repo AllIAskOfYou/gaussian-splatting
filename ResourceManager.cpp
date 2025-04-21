@@ -26,15 +26,19 @@ glm::mat4 quat_to_rot(glm::vec4 q) {
 }
 
 ShaderModule ResourceManager::loadShaderModule(const std::filesystem::path& path, Device device) {
-	std::ifstream file(path);
-	if (!file.is_open()) {
-		return nullptr;
-	}
-	file.seekg(0, std::ios::end);
-	size_t size = file.tellg();
-	std::string shaderSource(size, ' ');
-	file.seekg(0);
-	file.read(shaderSource.data(), size);
+    std::ifstream file(path);
+    if (!file) {
+        throw std::runtime_error("Failed to open WGSL file: " + path.string());
+    }
+
+    std::stringstream buffer;
+    buffer << file.rdbuf(); // Read the whole file into the buffer
+    std::string shaderSource = buffer.str();
+
+	// print the file contents
+	std::cout << "Shader source: " << std::endl;
+	std::cout << shaderSource << std::endl;
+	std::cout << "Shader size: " << shaderSource.size() << std::endl;
 
 	ShaderModuleWGSLDescriptor shaderCodeDesc{};
 	shaderCodeDesc.chain.next = nullptr;

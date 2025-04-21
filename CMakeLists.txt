@@ -34,8 +34,6 @@ add_executable(App
 	OrbitCamera.h
 
 	SplatMesh.h
-
-	ska_sort.hpp
 )
 
 target_include_directories(App PRIVATE .)

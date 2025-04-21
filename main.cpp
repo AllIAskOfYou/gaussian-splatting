@@ -54,7 +54,7 @@ private:
 		float splatSize = 1;
 		float cutOff = 3.5;
 		float fov = 45.0;
-		float pad[1];
+		float bayerSize = 4;
 	};
 
 private:
@@ -118,8 +118,8 @@ private:
 	float rot3 = 0.0f;
 
 	// OTHER ----------------------------------------------------------
-	float width = 1200;
-	float height = 800;
+	float width = 1920;
+	float height = 1080;
 
 
 	// time
@@ -323,6 +323,7 @@ void Application::MainLoop() {
 	// Sort the splats
 	glm::vec3 cameraPos = glm::vec3(camera->worldMatrix[3]);
 	//splatMesh.sortSplats(cameraPos);
+	splatMesh.update(cameraPos);
 
 	// Get the next target texture view
 	TextureView targetView = GetNextSurfaceTextureView();
@@ -590,7 +591,7 @@ void Application::InitializeBuffers() {
 
 
 	// Load the splat data
-	splatMesh.loadData(RESOURCE_DIR "/splats/plush.splat", true);
+	splatMesh.loadData(RESOURCE_DIR "/splats/nike.splat", true);
 	std::cout << "Loaded " << splatMesh.splatCount << " splats" << std::endl;
 
 	splatMesh.initialize(device, queue);
@@ -646,7 +647,7 @@ void Application::InitializeScene() {
 	scene->addChild(splatNode);
 	std::cout << "Scene initialized" << std::endl;
 	glm::vec3 cameraPos = glm::vec3(camera->worldMatrix[3]);
-	splatMesh.sortSplats(cameraPos);
+	splatMesh.sortIndices = splatMesh.sortSplats(cameraPos);
 };
 
 void Application::UpdateScene() {
@@ -711,6 +712,7 @@ void Application::updateGui(RenderPassEncoder renderPass) {
 
 		guiAddSliderParameter("Size", &uniforms.splatSize, 0.001f, 5.0f);
 		guiAddSliderParameter("Cut Off", &uniforms.cutOff, 0.001f, 5.0f);
+		guiAddSliderParameter("Bayer", &uniforms.bayerSize, 2.0f, 16.0f);
 
 		ImGui::EndTable();
 	}

@@ -5,6 +5,7 @@ struct Uniforms {
 	splatSize: f32,
 	cutOff: f32,
 	fov: f32,
+	bayerSize: f32,
 };
 
 struct Splat {
@@ -20,6 +21,8 @@ struct VertexOutput {
 	@builtin(position) position: vec4f,
 	@location(0) color: vec4f,
     @location(1) uv: vec2f,
+	@location(2) instanceIndex: u32,
+	@location(3) bayerSize: f32,
 };
 
 fn eigenvectors(a: mat2x2<f32>) -> mat2x2<f32> {
@@ -37,7 +40,7 @@ fn eigenvectors(a: mat2x2<f32>) -> mat2x2<f32> {
 }
 
 @vertex
-fn vs_main(@builtin(instance_index) instanceIndex: u32, @location(0) quadPosition: vec2f,) -> VertexOutput {
+fn vs_main(@builtin(instance_index) instanceIndex: u32, @location(0) quadPosition: vec2f) -> VertexOutput {
 	var s = uniforms.splatSize;
 	var cut_off = uniforms.cutOff;
 	var vm = uniforms.viewMatrix;
@@ -62,16 +65,73 @@ fn vs_main(@builtin(instance_index) instanceIndex: u32, @location(0) quadPositio
 
 	var out: VertexOutput; // create the output struct
 	out.position =  uniforms.projectionMatrix * v_pos;// + v_offset * v_pos.w;
-	out.color = instance.color; 
-    out.uv = quadPosition*cut_off;
+	out.color = instance.color;
+	out.uv = quadPosition * cut_off;
+	out.instanceIndex = instanceIndex;
+	out.bayerSize = uniforms.bayerSize;
 	return out;
 }
+
+fn generate_permutation(state: u32) -> vec4<u32> {
+	var s = state;
+	var fac_state = array<u32, 3>(0, 0, 0);
+	fac_state[0] = s / 6u;
+	s = s - fac_state[0] * 6u;
+	fac_state[1] = s / 2u;
+	s = s - fac_state[1] * 2u;
+	fac_state[2] = s;
+
+	var bayer_size = 8u;
+	var init_array = vec4<u32>(0, 1, 2, 3);
+	for (var i = 0u; i < 3u; i = i + 1u) {
+		var tmp = init_array[i];
+		init_array[i] = init_array[fac_state[i] + i];
+		init_array[fac_state[i] + i] = tmp;
+	}
+
+	return init_array;
+}
+
+fn generate_bayer_value(x: u32, y: u32, bayer_size: u32, init_array: vec4<u32>) -> u32 {
+	var value = 0u;
+	var current_size = bayer_size;
+	var current_x = x;
+	var current_y = y;
+	var k = 1u;
+
+	while (current_size > 1u) {
+		current_size = current_size / 2u;
+		var cell_x = current_x / current_size;
+		var cell_y = current_y / current_size;
+		current_x = current_x % current_size;
+		current_y = current_y % current_size;
+		var index = cell_x * 2u + cell_y;
+		value = value + init_array[index] * k;
+		k = k * 4u;
+	}
+	return value;
+}
+
+fn generate_bayer(x: u32, y: u32, bayer_size: u32, init_state: u32) -> u32 {
+	var init_array = generate_permutation(init_state % 24);
+	var value = generate_bayer_value(x % bayer_size, y % bayer_size, bayer_size, init_array);
+	return value;
+}
+
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	var uv = in.uv;
 	var dist = uv.x * uv.x + uv.y * uv.y;
 	var falloff = exp(- 0.5*dist);
-	var color = vec4f(in.color.xyz, in.color.w * falloff);
+	var alpha = in.color.w * falloff;
+
+	var BAYER_SIZE = 4u;
+	var x = in.position.x;
+	var y = in.position.y;
+	var bayerValue = f32(generate_bayer(u32(x), u32(y), BAYER_SIZE, u32(in.instanceIndex)));
+	alpha = select(0.0, 1.0, (alpha*in.bayerSize) * f32(BAYER_SIZE * BAYER_SIZE + 1)-2 > bayerValue + 1);
+
+	var color = vec4f(in.color.xyz, alpha);
 	return color;
 }
