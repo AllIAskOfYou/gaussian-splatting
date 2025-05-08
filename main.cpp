@@ -54,7 +54,9 @@ private:
 		float splatSize = 1;
 		float cutOff = 3.5;
 		float fov = 45.0;
-		float bayerSize = 4;
+		uint32_t bayerSize = 0;
+		float bayerScale = 1.0f;
+		float padding[3]; // Padding to 16 bytes
 	};
 
 private:
@@ -81,6 +83,7 @@ private:
     void updateGui(wgpu::RenderPassEncoder renderPass); // called in onFrame
 
 	void guiAddSliderParameter(const char* label, float* value, float min, float max);
+	void guiAddIntSliderParameter(const char* label, int* value, int min, int max);
 
 private:
 	// We put here all the variables that are shared between init and main loop
@@ -118,8 +121,8 @@ private:
 	float rot3 = 0.0f;
 
 	// OTHER ----------------------------------------------------------
-	float width = 1920;
-	float height = 1080;
+	float width = 1200;
+	float height = 800;
 
 
 	// time
@@ -178,7 +181,7 @@ bool Application::Initialize() {
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-	m_window = glfwCreateWindow(width, height, "Learn WebGPU", nullptr, nullptr);
+	m_window = glfwCreateWindow(width, height, "Gaussian Splatting", nullptr, nullptr);
 
 	glfwSetWindowUserPointer(m_window, this);
 
@@ -268,7 +271,7 @@ bool Application::Initialize() {
 	config.viewFormatCount = 0;
 	config.viewFormats = nullptr;
 	config.device = device;
-	config.presentMode = PresentMode::Fifo;
+	config.presentMode = PresentMode::Immediate;
 	config.alphaMode = CompositeAlphaMode::Auto;
 
 	surface.configure(config);
@@ -512,7 +515,7 @@ void Application::InitializePipeline() {
 	// The binding index as used in the @binding attribute in the shader
 	bindingLayouts[0].binding = 0;
 	// The stage that needs to access this resource
-	bindingLayouts[0].visibility = ShaderStage::Vertex;
+	bindingLayouts[0].visibility = ShaderStage::Vertex | ShaderStage::Fragment;
 	bindingLayouts[0].buffer.type = BufferBindingType::Uniform;
 	bindingLayouts[0].buffer.minBindingSize = sizeof(Uniforms);
 
@@ -685,6 +688,19 @@ void Application::guiAddSliderParameter(const char* label, float* value, float m
 	ImGui::TableNextRow();
 }
 
+void Application::guiAddIntSliderParameter(const char* label, int* value, int min, int max) {
+	// Left cell (Text)
+	ImGui::TableSetColumnIndex(0);
+	ImGui::Text(label);
+
+	// Right cell (Slider)
+	ImGui::TableSetColumnIndex(1);
+	const char* id = ("##" + std::string(label)).c_str();
+	ImGui::PushItemWidth(ImGui::GetColumnWidth() * 1.0f);
+	ImGui::SliderInt(id, value, min, max, "%d");
+	ImGui::TableNextRow();
+}
+
 void Application::updateGui(RenderPassEncoder renderPass) {
     // Start the Dear ImGui frame
     ImGui_ImplWGPU_NewFrame();
@@ -712,7 +728,8 @@ void Application::updateGui(RenderPassEncoder renderPass) {
 
 		guiAddSliderParameter("Size", &uniforms.splatSize, 0.001f, 5.0f);
 		guiAddSliderParameter("Cut Off", &uniforms.cutOff, 0.001f, 5.0f);
-		guiAddSliderParameter("Bayer", &uniforms.bayerSize, 2.0f, 16.0f);
+		guiAddIntSliderParameter("BayerSize", reinterpret_cast<int*>(&uniforms.bayerSize), 0, 6);
+		guiAddSliderParameter("BayerScale", &uniforms.bayerScale, 0.5f, 2.0f);
 
 		ImGui::EndTable();
 	}

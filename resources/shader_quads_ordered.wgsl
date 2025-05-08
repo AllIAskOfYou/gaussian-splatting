@@ -5,7 +5,8 @@ struct Uniforms {
 	splatSize: f32,
 	cutOff: f32,
 	fov: f32,
-	bayerSize: f32,
+	bayerSize: u32,
+	bayerScale: f32,
 };
 
 struct Splat {
@@ -22,7 +23,6 @@ struct VertexOutput {
 	@location(0) color: vec4f,
     @location(1) uv: vec2f,
 	@location(2) instanceIndex: u32,
-	@location(3) bayerSize: f32,
 };
 
 fn eigenvectors(a: mat2x2<f32>) -> mat2x2<f32> {
@@ -68,7 +68,6 @@ fn vs_main(@builtin(instance_index) instanceIndex: u32, @location(0) quadPositio
 	out.color = instance.color;
 	out.uv = quadPosition * cut_off;
 	out.instanceIndex = instanceIndex;
-	out.bayerSize = uniforms.bayerSize;
 	return out;
 }
 
@@ -81,14 +80,12 @@ fn generate_permutation(state: u32) -> vec4<u32> {
 	s = s - fac_state[1] * 2u;
 	fac_state[2] = s;
 
-	var bayer_size = 8u;
 	var init_array = vec4<u32>(0, 1, 2, 3);
 	for (var i = 0u; i < 3u; i = i + 1u) {
 		var tmp = init_array[i];
 		init_array[i] = init_array[fac_state[i] + i];
 		init_array[fac_state[i] + i] = tmp;
 	}
-
 	return init_array;
 }
 
@@ -126,12 +123,38 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	var falloff = exp(- 0.5*dist);
 	var alpha = in.color.w * falloff;
 
-	var BAYER_SIZE = 4u;
+	var BAYER_SIZE = u32(uniforms.bayerSize);
+	if (BAYER_SIZE == 1) {
+		return vec4f(in.color.xyz, alpha);
+	}
+	if (uniforms.bayerSize == 10) {
+		alpha = select(0.0, 1.0, alpha > uniforms.bayerScale);
+		return vec4f(in.color.xyz, alpha);
+	}
+
+	// hardcoded 4x4 bayer table
+	//var bayerTable = array<u32, 16>
+	//	(0, 8, 2, 10,
+	//	12, 4, 14, 6,
+	//	3, 11, 1, 9,
+	//	15, 7, 13, 5);
+	
 	var x = in.position.x;
 	var y = in.position.y;
-	var bayerValue = f32(generate_bayer(u32(x), u32(y), BAYER_SIZE, u32(in.instanceIndex)));
-	alpha = select(0.0, 1.0, (alpha*in.bayerSize) * f32(BAYER_SIZE * BAYER_SIZE + 1)-2 > bayerValue + 1);
+	var bayerValue: f32 = (x % 4.0) * 4.0 + (y % 4.0);
+	alpha = select(0.0, 1.0, alpha * (16.0 + 1.0) > (bayerValue + 1.0));
 
-	var color = vec4f(in.color.xyz, alpha);
-	return color;
+	//var x = u32(in.position.x);
+	//var y = u32(in.position.y);
+	//var bayerValue = ((x & 3u) << 2) + (y & 3u);
+	//alpha = select(0.0, 1.0, (alpha) * f32(16 + 1) > f32(bayerValue) + 1);
+	return vec4f(in.color.xyz, alpha);
+	//var x = in.position.x;
+	//var y = in.position.y;
+	//var bayerValue = f32(generate_bayer(u32(x), u32(y), BAYER_SIZE, u32(in.instanceIndex)));
+	//if ((alpha*uniforms.bayerScale) * f32(BAYER_SIZE * BAYER_SIZE + 1) < bayerValue + 1) {
+	//	discard;
+	//}
+	//var color = vec4f(in.color.xyz, 1.0f);
+	//return color;
 }
