@@ -34,11 +34,16 @@ add_executable(App
 	OrbitCamera.h
 
 	SplatMesh.h
+
+	Cloth.h
 )
 
 target_include_directories(App PRIVATE .)
 
-target_link_libraries(App PRIVATE glfw webgpu glfw3webgpu imgui)
+# link openmp
+find_package(OpenMP REQUIRED)
+
+target_link_libraries(App PRIVATE glfw webgpu glfw3webgpu imgui OpenMP::OpenMP_CXX)
 
 # We add an option to enable different settings when developing the app than
 # when distributing it.

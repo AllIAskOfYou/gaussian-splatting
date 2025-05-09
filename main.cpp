@@ -27,15 +27,16 @@
 #include "Camera.h"
 #include "OrbitCamera.h"
 
-#include "SplatMesh.h"
+#include "Cloth.h"
 
 using namespace wgpu;
 
 class Application {
 public:
+
 	Application() = default;
 	// Initialize everything and return true if it went all right
-	bool Initialize();
+	bool Initialize(Cloth::Parameters &params);
 
 	// Uninitialize everything that was initialized
 	void Terminate();
@@ -51,12 +52,10 @@ private:
 		glm::mat4x4 projectionMatrix;
 		glm::mat4x4 viewMatrix;
 		glm::mat4x4 modelMatrix;
-		float splatSize = 1;
-		float cutOff = 3.5;
 		float fov = 45.0;
-		uint32_t bayerSize = 0;
-		float bayerScale = 1.0f;
-		float padding[3]; // Padding to 16 bytes
+		uint32_t width;
+		uint32_t height;
+		float padding[1]; // Padding to 16 bytes
 	};
 
 private:
@@ -84,6 +83,7 @@ private:
 
 	void guiAddSliderParameter(const char* label, float* value, float min, float max);
 	void guiAddIntSliderParameter(const char* label, int* value, int min, int max);
+	void guiAddColorParameter(const char* label, ImVec4* color);
 
 private:
 	// We put here all the variables that are shared between init and main loop
@@ -107,22 +107,16 @@ private:
 	std::shared_ptr<Node> scene = std::make_shared<Node>();
 	std::shared_ptr<OrbitCamera> orbitCamera = std::make_shared<OrbitCamera>(5.0);
 	std::shared_ptr<Camera> camera = std::make_shared<Camera>();
-	std::shared_ptr<Node> splatNode = std::make_shared<Node>();
-
-	SplatMesh splatMesh;
+	std::shared_ptr<Cloth> cloth;
 
 	Uniforms uniforms;
 
 	ImGuiIO imGuiIo;
 
-	// DEBUGGING -----------------------------------------------------
-	float rot1 = 0.0f;
-	float rot2 = 0.0f;
-	float rot3 = 0.0f;
-
 	// OTHER ----------------------------------------------------------
 	float width = 1200;
 	float height = 800;
+	ImVec4 bgColor = ImVec4(0.466f, 0.137f, 0.0f, 1.0f);
 
 
 	// time
@@ -130,10 +124,16 @@ private:
 	double deltaTime;
 };
 
-int main() {
+int main(int argc, char *argv[]) {
 	Application app;
+	// get cloth width and height from command line
+	Cloth::Parameters clothParams;
+	if (argc > 2) {
+		clothParams.width = std::stoull(argv[1]);
+		clothParams.height = std::stoull(argv[2]);
+	}
 
-	if (!app.Initialize()) {
+	if (!app.Initialize(clothParams)) {
 		return 1;
 	}
 
@@ -176,7 +176,10 @@ void Application::onScroll([[maybe_unused]] double xoffset, double yoffset) {
 	orbitCamera->onScroll(yoffset, deltaTime);
 }
 
-bool Application::Initialize() {
+bool Application::Initialize(Cloth::Parameters &params) {
+	// Initialize the cloth
+	cloth = std::make_shared<Cloth>(params);
+
 	// Open window
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -318,15 +321,10 @@ void Application::MainLoop() {
 	// Create a transform matrix
 	uniforms.projectionMatrix = camera->getProjectionMatrix();
 	uniforms.viewMatrix = camera->getViewMatrix();
-	uniforms.modelMatrix = splatNode->worldMatrix;
+	uniforms.modelMatrix = cloth->worldMatrix;
 
 	// Upload the transform matrix to the buffer
 	queue.writeBuffer(transformBuffer, 0, &uniforms, sizeof(Uniforms));
-
-	// Sort the splats
-	glm::vec3 cameraPos = glm::vec3(camera->worldMatrix[3]);
-	//splatMesh.sortSplats(cameraPos);
-	splatMesh.update(cameraPos);
 
 	// Get the next target texture view
 	TextureView targetView = GetNextSurfaceTextureView();
@@ -343,13 +341,19 @@ void Application::MainLoop() {
 	renderPass.setPipeline(pipeline);
 
 	// Set vertex buffer while encoding the render pass
-	splatMesh.setBuffers(renderPass);
+	cloth->setBuffers(renderPass);
+
+	// print positions
+	//for (int i = 0; i < cloth->particleCount; i++) {
+	//	glm::vec3 position = cloth->particles[i].position;
+	//	std::cout << "Position " << i << ": " << position.x << ", " << position.y << ", " << position.z << std::endl;
+	//}
 
 	// Set binding group here!
 	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
 
 	// Draw the splat
-	renderPass.drawIndexed(6, splatMesh.splatCount, 0, 0, 0);
+	renderPass.drawIndexed(cloth->indexCount, 1, 0, 0, 0);
 
 	updateGui(renderPass);
 
@@ -424,7 +428,8 @@ RenderPassEncoder Application::createRenderPassEncoder(TextureView &targetView, 
 	renderPassColorAttachment.resolveTarget = nullptr;
 	renderPassColorAttachment.loadOp = LoadOp::Clear;
 	renderPassColorAttachment.storeOp = StoreOp::Store;
-	renderPassColorAttachment.clearValue = WGPUColor{ 0.05, 0.05, 0.05, 1.0 };
+	//renderPassColorAttachment.clearValue = WGPUColor{ 0.0, 0.0, 0.0, 1.0 };
+	renderPassColorAttachment.clearValue = WGPUColor{ bgColor.x, bgColor.y, bgColor.z, bgColor.w };
 	#ifndef WEBGPU_BACKEND_WGPU
 		renderPassColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
 	#endif // NOT WEBGPU_BACKEND_WGPU
@@ -440,7 +445,7 @@ RenderPassEncoder Application::createRenderPassEncoder(TextureView &targetView, 
 
 void Application::InitializePipeline() {
 	std::cout << "Creating shader module..." << std::endl;
-	ShaderModule shaderModule = ResourceManager::loadShaderModule(RESOURCE_DIR "/shader_quads_ordered.wgsl", device);
+	ShaderModule shaderModule = ResourceManager::loadShaderModule(RESOURCE_DIR "/shader_cloth.wgsl", device);
 	std::cout << "Shader module: " << shaderModule << std::endl;
 
 	// Check for errors
@@ -449,12 +454,11 @@ void Application::InitializePipeline() {
 		exit(1);
 	}
 
-	std::cout << "Splat size: " << sizeof(Splat) << std::endl;
 	// Create the render pipeline
 	RenderPipelineDescriptor pipelineDesc;
 
-	pipelineDesc.vertex.bufferCount = splatMesh.vertexBufferLayouts.size();
-	pipelineDesc.vertex.buffers = splatMesh.vertexBufferLayouts.data();
+	pipelineDesc.vertex.bufferCount = 0;
+	pipelineDesc.vertex.buffers = nullptr;
 
 	// NB: We define the 'shaderModule' in the second part of this chapter.
 	// Here we tell that the programmable vertex shader stage is described
@@ -511,7 +515,7 @@ void Application::InitializePipeline() {
 	pipelineDesc.multisample.alphaToCoverageEnabled = false;
 
 	// Define binding layout (don't forget to = Default)
-	BindGroupLayoutEntry bindingLayouts[3] = {};
+	BindGroupLayoutEntry bindingLayouts[2] = {};
 	// The binding index as used in the @binding attribute in the shader
 	bindingLayouts[0].binding = 0;
 	// The stage that needs to access this resource
@@ -522,16 +526,11 @@ void Application::InitializePipeline() {
 	bindingLayouts[1].binding = 1;
 	bindingLayouts[1].visibility = ShaderStage::Vertex;
 	bindingLayouts[1].buffer.type = BufferBindingType::ReadOnlyStorage;
-	bindingLayouts[1].buffer.minBindingSize = splatMesh.splatCount * sizeof(Splat);
-
-	bindingLayouts[2].binding = 2;
-	bindingLayouts[2].visibility = ShaderStage::Vertex;
-	bindingLayouts[2].buffer.type = BufferBindingType::ReadOnlyStorage;
-	bindingLayouts[2].buffer.minBindingSize = splatMesh.splatCount * sizeof(uint32_t);
+	bindingLayouts[1].buffer.minBindingSize = cloth->particleCount * sizeof(Cloth::Particle);
 
 	// Create a bind group layout
 	BindGroupLayoutDescriptor bindGroupLayoutDesc{};
-	bindGroupLayoutDesc.entryCount = 3;
+	bindGroupLayoutDesc.entryCount = 2;
 	bindGroupLayoutDesc.entries = bindingLayouts;
 	bindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDesc);
 
@@ -580,24 +579,7 @@ RequiredLimits Application::GetRequiredLimits(Adapter adapter) const {
 }
 
 void Application::InitializeBuffers() {
-	std::vector<Splat> splats;
-	Splat s;
-	s.transform = glm::mat4(1.0f);
-	s.transform[2][2] = 5.0f;
-	s.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
-
-	splats.push_back(s);
-
-	splatMesh.splatCount = 1;
-	splatMesh.splatData = splats;
-	
-
-
-	// Load the splat data
-	splatMesh.loadData(RESOURCE_DIR "/splats/nike.splat", true);
-	std::cout << "Loaded " << splatMesh.splatCount << " splats" << std::endl;
-
-	splatMesh.initialize(device, queue);
+	cloth->initialize(device, queue);
 
 	// Create a transform uniform buffer
 	BufferDescriptor bufferDesc;
@@ -609,7 +591,7 @@ void Application::InitializeBuffers() {
 
 void Application::InitializeBindGroups() {
 	// Create a binding
-	BindGroupEntry bindings[3] = {};
+	BindGroupEntry bindings[2] = {};
 	
 	bindings[0].binding = 0;
 	bindings[0].buffer = transformBuffer;
@@ -617,20 +599,15 @@ void Application::InitializeBindGroups() {
 	bindings[0].size = sizeof(Uniforms);
 
 	bindings[1].binding = 1;
-	bindings[1].buffer = splatMesh.splatBuffer;
+	bindings[1].buffer = cloth->particleBuffer;
 	bindings[1].offset = 0;
-	bindings[1].size = splatMesh.splatCount * sizeof(Splat);
-
-	bindings[2].binding = 2;
-	bindings[2].buffer = splatMesh.sortIndexBuffer;
-	bindings[2].offset = 0;
-	bindings[2].size = splatMesh.splatCount * sizeof(uint32_t);
+	bindings[1].size = cloth->particleCount * sizeof(Cloth::Particle);
 
 	// A bind group contains one or multiple bindings
 	BindGroupDescriptor bindGroupDesc{};
 	bindGroupDesc.layout = bindGroupLayout;
 	// There must be as many bindings as declared in the layout!
-	bindGroupDesc.entryCount = 3;
+	bindGroupDesc.entryCount = 2;
 	bindGroupDesc.entries = bindings;
 	bindGroup = device.createBindGroup(bindGroupDesc);
 }
@@ -638,24 +615,29 @@ void Application::InitializeBindGroups() {
 void Application::InitializeScene() {
 	std::cout << "Initializing scene..." << std::endl;
 
+	orbitCamera->orbitRate = 0.5f;
+	orbitCamera->scrollRate = 10.0f;
 	camera = orbitCamera->camera;
 	camera->aspect = width / height;
 	//orbitCamera->position = glm::vec3(0.0f, 0.0f, 5.0f);
 	scene->addChild(orbitCamera);
 
 	// Create a node for the splat
-	splatNode->position = glm::vec3(0.0f, 0.0f, 0.0f);
-	splatNode->scale = glm::vec3(1.0f, 1.0f, 1.0f);
-	//splatNode->rotate(glm::vec3(0.0f, 1.0f, 0.0f), glm::radians(90.0f));
-	scene->addChild(splatNode);
+	std::cout << "Cloth: Index count: " << cloth->indexCount << std::endl;
+	std::cout << "Cloth: Vertex count: " << cloth->particleCount << std::endl;
+	cloth->position = glm::vec3(0.0f, 0.0f, 0.0f);
+	cloth->scale = glm::vec3(1.0f, 1.0f, 1.0f);
+	//cloth->rotate(glm::vec3(0.0f, 1.0f, 0.0f), glm::radians(90.0f));
+	scene->addChild(cloth);
 	std::cout << "Scene initialized" << std::endl;
-	glm::vec3 cameraPos = glm::vec3(camera->worldMatrix[3]);
-	splatMesh.sortIndices = splatMesh.sortSplats(cameraPos);
+	//glm::vec3 cameraPos = glm::vec3(camera->worldMatrix[3]);
+	cloth->update(deltaTime);
 };
 
 void Application::UpdateScene() {
 	scene->updateWorldMatrix(glm::mat4(1.0f));
 	camera->fov = uniforms.fov;
+	cloth->update(deltaTime);
 };
 	
 bool Application::initGui() {
@@ -701,6 +683,20 @@ void Application::guiAddIntSliderParameter(const char* label, int* value, int mi
 	ImGui::TableNextRow();
 }
 
+void Application::guiAddColorParameter(const char* label, ImVec4* color) {
+    // Left cell (Text)
+    ImGui::TableSetColumnIndex(0);
+    ImGui::Text(label);
+
+    // Right cell (Color picker)
+    ImGui::TableSetColumnIndex(1);
+    const char* id = ("##" + std::string(label)).c_str();
+    ImGui::PushItemWidth(ImGui::GetColumnWidth() * 1.0f);
+    ImGui::ColorEdit4(id, (float*)color, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+
+    ImGui::TableNextRow();
+}
+
 void Application::updateGui(RenderPassEncoder renderPass) {
     // Start the Dear ImGui frame
     ImGui_ImplWGPU_NewFrame();
@@ -715,21 +711,34 @@ void Application::updateGui(RenderPassEncoder renderPass) {
 	//ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(0, 0));
 	ImGui::Begin("Control Panel", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
-	
-	ImGui::Text("SPLATS");
-	
-
-	if (ImGui::BeginTable("table", 2, ImGuiTableFlags_SizingFixedSame | ImGuiTableFlags_BordersOuter)) {
+	ImGui::Text("Other");
+	if (ImGui::BeginTable("table", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersOuter)) {
 		ImGui::TableSetupColumn("Text", ImGuiTableColumnFlags_WidthFixed, columnWidth); // Auto stretch
-		ImGui::TableSetupColumn("Slider", ImGuiTableColumnFlags_WidthStretch, 2*columnWidth); // Fixed width
+		ImGui::TableSetupColumn("Slider", ImGuiTableColumnFlags_None, 2*columnWidth); // Fixed width
 
 		ImGui::TableNextRow();
 		ImGui::TableNextRow();
 
-		guiAddSliderParameter("Size", &uniforms.splatSize, 0.001f, 5.0f);
-		guiAddSliderParameter("Cut Off", &uniforms.cutOff, 0.001f, 5.0f);
-		guiAddIntSliderParameter("BayerSize", reinterpret_cast<int*>(&uniforms.bayerSize), 0, 6);
-		guiAddSliderParameter("BayerScale", &uniforms.bayerScale, 0.5f, 2.0f);
+		// background color
+		guiAddColorParameter("Background color", &bgColor);
+
+		ImGui::EndTable();
+	}
+
+	ImGui::Text("Cloth");
+
+	if (ImGui::BeginTable("table_cloth", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersOuter)) {
+		ImGui::TableSetupColumn("Text", ImGuiTableColumnFlags_WidthFixed, columnWidth); // Auto stretch
+		ImGui::TableSetupColumn("Slider", ImGuiTableColumnFlags_None, 2*columnWidth); // Fixed width
+
+		ImGui::TableNextRow();
+		ImGui::TableNextRow();
+
+		
+		guiAddSliderParameter("Time scale", &(cloth->timeScale), 0.0, 2.0f);
+		guiAddSliderParameter("Energy preservation", &(cloth->energyPreservation), 0.1f, 1.0f);
+		guiAddSliderParameter("Min delta time", &(cloth->minDeltatime), 0.001f, 0.1f);
+		guiAddIntSliderParameter("Substeps", reinterpret_cast<int*>(&(cloth->substeps)), 1, 100);
 
 		ImGui::EndTable();
 	}
