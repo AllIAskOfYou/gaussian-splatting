@@ -52,6 +52,7 @@ private:
 		glm::mat4x4 projectionMatrix;
 		glm::mat4x4 viewMatrix;
 		glm::mat4x4 modelMatrix;
+		ImVec4 ambientColor = ImVec4(0.0f, 0.0f, 0.0f, 0.8f);//ImVec4(0.466f, 0.137f, 0.0f, 1.0f);
 		float fov = 45.0;
 		uint32_t width;
 		uint32_t height;
@@ -114,9 +115,10 @@ private:
 	ImGuiIO imGuiIo;
 
 	// OTHER ----------------------------------------------------------
-	float width = 1200;
-	float height = 800;
-	ImVec4 bgColor = ImVec4(0.466f, 0.137f, 0.0f, 1.0f);
+	float width = 1920;
+	float height = 1080;
+
+	glm::vec2 mousePos{0.0f};
 
 
 	// time
@@ -160,7 +162,15 @@ int main(int argc, char *argv[]) {
 }
 
 void Application::onMouseMove(double xpos, double ypos) {
+	mousePos.x = xpos;
+	mousePos.y = ypos;
 	orbitCamera->onMouseMove(xpos, ypos, deltaTime);
+	glm::vec3 rayOrigin = glm::vec3(camera->worldMatrix[3]);
+	float x = (2.0f * mousePos.x) / width - 1.0f;
+	float y = 1.0f - (2.0f * mousePos.y) / height;
+	glm::vec3 rayDirection = camera->getRay(x, y);
+	glm::vec3 forward = glm::vec3(camera->worldMatrix[2]);
+	cloth->movePinnedParticle(rayOrigin, rayDirection, forward);
 }
 
 void Application::onMouseButton(int button, int action, [[maybe_unused]] int mods) {
@@ -169,7 +179,18 @@ void Application::onMouseButton(int button, int action, [[maybe_unused]] int mod
         // interaction at this frame.
         return;
     }
-	orbitCamera->onMouseButton(button, action);
+	
+    if (button == 0) {
+		orbitCamera->onMouseButton(action);
+	} else if (button == 1) {
+		// get the perspective ray from the camera (origin, direction) in world space
+		glm::vec3 rayOrigin = glm::vec3(camera->worldMatrix[3]);
+		//std::cout << "Mouse x: " << mousePos.x << std::endl;
+        float x = (2.0f * mousePos.x) / width - 1.0f;
+        float y = 1.0f - (2.0f * mousePos.y) / height;
+		glm::vec3 rayDirection = camera->getRay(x, y);
+		cloth->pinParticle(action, rayOrigin, rayDirection);
+	}
 }
 
 void Application::onScroll([[maybe_unused]] double xoffset, double yoffset) {
@@ -429,7 +450,8 @@ RenderPassEncoder Application::createRenderPassEncoder(TextureView &targetView, 
 	renderPassColorAttachment.loadOp = LoadOp::Clear;
 	renderPassColorAttachment.storeOp = StoreOp::Store;
 	//renderPassColorAttachment.clearValue = WGPUColor{ 0.0, 0.0, 0.0, 1.0 };
-	renderPassColorAttachment.clearValue = WGPUColor{ bgColor.x, bgColor.y, bgColor.z, bgColor.w };
+	ImVec4 ambientColor = uniforms.ambientColor;
+	renderPassColorAttachment.clearValue = WGPUColor{ ambientColor.x, ambientColor.y, ambientColor.z, ambientColor.w };
 	#ifndef WEBGPU_BACKEND_WGPU
 		renderPassColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
 	#endif // NOT WEBGPU_BACKEND_WGPU
@@ -631,13 +653,16 @@ void Application::InitializeScene() {
 	scene->addChild(cloth);
 	std::cout << "Scene initialized" << std::endl;
 	//glm::vec3 cameraPos = glm::vec3(camera->worldMatrix[3]);
-	cloth->update(deltaTime);
+	glm::vec3 cameraPos = glm::vec3(camera->worldMatrix[3]);
+	cloth->update(deltaTime, cameraPos);
 };
 
 void Application::UpdateScene() {
 	scene->updateWorldMatrix(glm::mat4(1.0f));
 	camera->fov = uniforms.fov;
-	cloth->update(deltaTime);
+	glm::vec3 cameraPos = glm::vec3(camera->worldMatrix[3]);
+	//glm::vec3 cameraPos{10.0f, 0.0f, 0.0f};
+	cloth->update(deltaTime, cameraPos);
 };
 	
 bool Application::initGui() {
@@ -720,7 +745,7 @@ void Application::updateGui(RenderPassEncoder renderPass) {
 		ImGui::TableNextRow();
 
 		// background color
-		guiAddColorParameter("Background color", &bgColor);
+		guiAddColorParameter("Background color", &uniforms.ambientColor);
 
 		ImGui::EndTable();
 	}
@@ -739,6 +764,7 @@ void Application::updateGui(RenderPassEncoder renderPass) {
 		guiAddSliderParameter("Energy preservation", &(cloth->energyPreservation), 0.1f, 1.0f);
 		guiAddSliderParameter("Min delta time", &(cloth->minDeltatime), 0.001f, 0.1f);
 		guiAddIntSliderParameter("Substeps", reinterpret_cast<int*>(&(cloth->substeps)), 1, 100);
+		guiAddSliderParameter("Break distance", &(cloth->breakDistance), 0.1f, 5.0f);
 
 		ImGui::EndTable();
 	}

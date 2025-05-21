@@ -36,10 +36,8 @@ public:
         }
     }
 
-    void onMouseButton(int button, int action) {
-        if (button == 0) {
-            pressed = action == 1;
-        }
+    void onMouseButton(int action) {
+        pressed = action == 1;
     }
 
     void onMouseMove(double xpos, double ypos, double deltaTime) {
