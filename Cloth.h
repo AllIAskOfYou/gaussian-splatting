@@ -291,7 +291,11 @@ private:
         dt *= timeScale;
         currentDeltatime = 0.0f;
 
+        // initialize timer to 0
+        std::chrono::duration<double> elapsedTime(0.0);
+
         for (size_t i = 0; i < currentSubsteps; ++i) {
+            auto start = std::chrono::high_resolution_clock::now();
             for (size_t j = 0; j < particleCount; ++j) {
                 glm::vec3 delta = particles[j].position - currentPositions[j];
                 particles[j].velocity = delta / dt * glm::pow(currentEnergyPreservation, dt);
@@ -300,7 +304,7 @@ private:
                 particles[j].position += particles[j].velocity * dt;
             }
 
-            //#pragma omp parallel for
+            #pragma omp parallel for
             for (size_t j = 0; j < constraints.size(); ++j) {
                 Constraint &c = constraints[j];
                 glm::vec3 delta = c.p2->position - c.p1->position;
@@ -355,7 +359,11 @@ private:
                     //    [&](const Constraint &c1) { return c1.p1 == c.p1 && c1.p2 == c.p2; }), constraints.end()); 
                 }
             }
+            auto end = std::chrono::high_resolution_clock::now();
+            elapsedTime += end - start;
         }
+        std::cout << "Time needed for one substep: " 
+                  << elapsedTime.count() / static_cast<double>(currentSubsteps) << "s" << std::endl;
     }
 
     void updateIndexes(glm::vec3 cameraPos) {

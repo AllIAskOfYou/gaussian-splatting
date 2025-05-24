@@ -51,6 +51,7 @@ private:
 	struct Uniforms {
 		glm::mat4x4 projectionMatrix;
 		glm::mat4x4 viewMatrix;
+		glm::mat4x4 viewMatrixInverse;
 		glm::mat4x4 modelMatrix;
 		ImVec4 ambientColor = ImVec4(0.0f, 0.0f, 0.0f, 0.8f);//ImVec4(0.466f, 0.137f, 0.0f, 1.0f);
 		float fov = 45.0;
@@ -342,6 +343,7 @@ void Application::MainLoop() {
 	// Create a transform matrix
 	uniforms.projectionMatrix = camera->getProjectionMatrix();
 	uniforms.viewMatrix = camera->getViewMatrix();
+	uniforms.viewMatrixInverse = camera->worldMatrix;
 	uniforms.modelMatrix = cloth->worldMatrix;
 
 	// Upload the transform matrix to the buffer
@@ -580,7 +582,7 @@ RequiredLimits Application::GetRequiredLimits(Adapter adapter) const {
 	RequiredLimits requiredLimits = Default;
 
 	// We use at most 2 vertex attributes
-	requiredLimits.limits.maxVertexAttributes = 10;
+	requiredLimits.limits.maxVertexAttributes = 12;
 	// We should also tell that we use 1 vertex buffers
 	requiredLimits.limits.maxVertexBuffers = 4;
 	// Maximum size of a buffer is 15 vertices of 5 float each
@@ -590,7 +592,7 @@ RequiredLimits Application::GetRequiredLimits(Adapter adapter) const {
 	//requiredLimits.limits.maxVertexBufferArrayStride = 5 * sizeof(float);
 
 	// There is a maximum of 3 float forwarded from vertex to fragment shader
-	requiredLimits.limits.maxInterStageShaderComponents = 10;
+	requiredLimits.limits.maxInterStageShaderComponents = 12;
 
 	// These two limits are different because they are "minimum" limits,
 	// they are the only ones we are may forward from the adapter's supported

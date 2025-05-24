@@ -1,6 +1,7 @@
 struct Uniforms {
     projectionMatrix: mat4x4f,
     viewMatrix: mat4x4f,
+	viewMatrixInverse: mat4x4f,
     modelMatrix: mat4x4f,
 	ambientColor: vec4f,
 	fov: f32,
@@ -25,6 +26,7 @@ struct VertexOutput {
 	@location(0) color: vec4f,
 	@location(1) normal: vec3f,
 	@location(2) uv: vec2f,
+	@location(3) worldPosition: vec3f,
 };
 
 @vertex
@@ -49,6 +51,7 @@ fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
 	out.color = color;
 	out.normal = particle.normal;
 	out.uv = particle.uv;
+	out.worldPosition = pos;
 	return out;
 }
 
@@ -61,9 +64,16 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	var vld = uniforms.viewMatrix * normalize(vec4f(-1.0, -1.0, -1.0, 0.0));
 	var vn = uniforms.viewMatrix * vec4f(in.normal, 0.0);
 	var vnt = vn;
-	if (vn.z < 0.0) {
+	//if (vn.z < 0.0) {
+	//	vnt = -vn;
+	//}
+	var cameraPos = uniforms.viewMatrixInverse[3].xyz;
+	var cameraDir = normalize(cameraPos - in.worldPosition.xyz);
+	if (dot(in.normal, cameraDir) < 0.0) {
 		vnt = -vn;
 	}
+
+
 	var lightColor = vec3f(1.0, 1.0, 1.0);
 	var ambientColor = uniforms.ambientColor.xyz;//vec3f(0.466, 0.137, 0.0) / 2.0;
 	var albedo = in.color.xyz;
