@@ -139,22 +139,22 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	//	3, 11, 1, 9,
 	//	15, 7, 13, 5);
 	
-	var x = in.position.x;
-	var y = in.position.y;
-	var bayerValue: f32 = (x % 4.0) * 4.0 + (y % 4.0);
-	alpha = select(0.0, 1.0, alpha * (16.0 + 1.0) > (bayerValue + 1.0));
+	//var x = in.position.x;
+	//var y = in.position.y;
+	//var bayerValue: f32 = (x % 4.0) * 4.0 + (y % 4.0);
+	//alpha = select(0.0, 1.0, alpha * (16.0 + 1.0) > (bayerValue + 1.0));
 
 	//var x = u32(in.position.x);
 	//var y = u32(in.position.y);
 	//var bayerValue = ((x & 3u) << 2) + (y & 3u);
 	//alpha = select(0.0, 1.0, (alpha) * f32(16 + 1) > f32(bayerValue) + 1);
-	return vec4f(in.color.xyz, alpha);
-	//var x = in.position.x;
-	//var y = in.position.y;
-	//var bayerValue = f32(generate_bayer(u32(x), u32(y), BAYER_SIZE, u32(in.instanceIndex)));
-	//if ((alpha*uniforms.bayerScale) * f32(BAYER_SIZE * BAYER_SIZE + 1) < bayerValue + 1) {
-	//	discard;
-	//}
-	//var color = vec4f(in.color.xyz, 1.0f);
-	//return color;
+	//return vec4f(in.color.xyz, alpha);
+	var x = in.position.x;
+	var y = in.position.y;
+	var bayerValue = f32(generate_bayer(u32(x), u32(y), BAYER_SIZE, u32(in.instanceIndex)));
+	if ((alpha*uniforms.bayerScale) * f32(BAYER_SIZE * BAYER_SIZE + 1) < bayerValue + 1) {
+		discard;
+	}
+	var color = vec4f(in.color.xyz, 1.0f);
+	return color;
 }

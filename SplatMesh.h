@@ -42,7 +42,6 @@ public:
     Device device;
     Queue queue;
 
-    std::future<std::vector<uint32_t>> sorter;
     std::vector<uint32_t> sortIndices;
 
     void loadData(const std::string &path, bool center) {
@@ -67,14 +66,8 @@ public:
     }
 
     void update(glm::vec3 cameraPos) {
-        if (!sorter.valid()) {
-            sorter = std::async(std::launch::async, &SplatMesh::sortSplats, this, cameraPos);
-        }
-        else if (sorter.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            // Update the sort index buffer
-            sortIndices = sorter.get();
-            queue.writeBuffer(sortIndexBuffer, 0, sortIndices.data(), splatCount * sizeof(uint32_t)); 
-        }
+        sortIndices = sortSplats(cameraPos);
+        queue.writeBuffer(sortIndexBuffer, 0, sortIndices.data(), splatCount * sizeof(uint32_t)); 
     }
 
     void setBuffers(RenderPassEncoder &renderPass) {

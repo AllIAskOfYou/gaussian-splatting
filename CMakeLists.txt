@@ -34,6 +34,12 @@ add_executable(App
 	OrbitCamera.h
 
 	SplatMesh.h
+
+	Renderer.hpp
+	Renderer.cpp
+
+	GUI.hpp
+	GUI.cpp
 )
 
 target_include_directories(App PRIVATE .)
