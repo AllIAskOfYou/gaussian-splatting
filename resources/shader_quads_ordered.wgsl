@@ -53,8 +53,9 @@ fn vs_main(@builtin(instance_index) instanceIndex: u32, @location(0) quadPositio
 	var s_center = wt * sm[3];
 	var s_rm = mat3x3f(sm[0].xyz, sm[1].xyz, sm[2].xyz);
 
-	var s_wt = wt_xyz * s_rm;
-	var s_var_t = s_wt * transpose(s_wt);
+	//var s_wt = wt_xyz * s_rm;
+	//var s_var_t = s_wt * transpose(s_wt);
+	var s_var_t = wt_xyz * s_rm * transpose(wt_xyz);
 	var s_var_t_xy = mat2x2f(s_var_t[0].xy, s_var_t[1].xy);
 
 	var s_var_proj = eigenvectors(s_var_t_xy);

@@ -8,6 +8,7 @@
 // extend the Node class
 class Camera : public Node {
 public:
+    using Ptr = std::shared_ptr<Camera>;
     // Camera properties
     float fov;
     float aspect;

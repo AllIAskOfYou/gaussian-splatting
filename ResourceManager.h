@@ -32,6 +32,15 @@ public:
 	);
 
 	/**
+	 * Load a file from `path` and return a vector of
+	 * splats in raw format.
+	 */
+	static SplatSplitVector loadSplatsRaw(
+		const std::filesystem::path& path,
+		bool center = false
+	);
+
+	/**
 	 * Load a file from `path` using our ad-hoc format and populate the `splats`
 	 * vector.
 	 */

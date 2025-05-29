@@ -3,28 +3,6 @@
 
 using namespace wgpu;
 
-glm::mat4 quat_to_rot(glm::vec4 q) {
-	glm::mat4 rot = glm::mat4(1.0f);
-	float qr = q[0];
-	float qi = q[1];
-	float qj = q[2];
-	float qk = q[3];
-
-	rot[0][0] = 1 - 2*(qj*qj + qk*qk);
-	rot[0][1] = 2*(qi*qj + qk*qr);
-	rot[0][2] = 2*(qi*qk - qj*qr);
-	
-	rot[1][0] = 2*(qi*qj - qk*qr);
-	rot[1][1] = 1 - 2*(qi*qi + qk*qk);
-	rot[1][2] = 2*(qj*qk + qi*qr);
-
-	rot[2][0] = 2*(qi*qk + qj*qr);
-	rot[2][1] = 2*(qj*qk - qi*qr);
-	rot[2][2] = 1 - 2*(qi*qi + qj*qj);
-	
-	return rot;
-}
-
 ShaderModule ResourceManager::loadShaderModule(const std::filesystem::path& path, Device device) {
     std::ifstream file(path);
     if (!file) {
@@ -36,9 +14,9 @@ ShaderModule ResourceManager::loadShaderModule(const std::filesystem::path& path
     std::string shaderSource = buffer.str();
 
 	// print the file contents
-	std::cout << "Shader source: " << std::endl;
-	std::cout << shaderSource << std::endl;
-	std::cout << "Shader size: " << shaderSource.size() << std::endl;
+	//std::cout << "Shader source: " << std::endl;
+	//std::cout << shaderSource << std::endl;
+	//std::cout << "Shader size: " << shaderSource.size() << std::endl;
 
 	ShaderModuleWGSLDescriptor shaderCodeDesc{};
 	shaderCodeDesc.chain.next = nullptr;
@@ -55,6 +33,36 @@ ShaderModule ResourceManager::loadShaderModule(const std::filesystem::path& path
 }
 
 
+SplatSplitVector ResourceManager::loadSplatsRaw(const std::filesystem::path& path, bool center) {
+	std::ifstream file{ path, std::ios::binary };
+	if (!file.is_open()) {
+		return {};
+	}
+
+	SplatSplitVector splats;
+	splats.clear();
+
+	SplatRaw splat;
+	while (file.read(reinterpret_cast<char*>(&splat), sizeof(SplatRaw))) {
+		splats.push_back(raw_to_split(splat));
+	}
+
+	file.close();
+
+	if (center) {
+		// center the splats
+		glm::vec3 center(0.0f);
+		for (const auto& s : splats) {
+			center += s.position;
+		}
+		center /= static_cast<float>(splats.size());
+		for (auto& s : splats) {
+			s.position -= center;
+		}
+	}
+
+	return splats;
+}
 
 bool ResourceManager::loadSplats(
 	const std::filesystem::path& path,

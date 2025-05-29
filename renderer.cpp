@@ -112,6 +112,11 @@ RequiredLimits Renderer::get_required_limits(Adapter &adapter) {
         supported_limits.limits.minUniformBufferOffsetAlignment;
     required_limits.limits.minStorageBufferOffsetAlignment =
         supported_limits.limits.minStorageBufferOffsetAlignment;
+
+    required_limits.limits.maxBufferSize = 
+        supported_limits.limits.maxBufferSize;
+    required_limits.limits.maxStorageBufferBindingSize =
+        supported_limits.limits.maxStorageBufferBindingSize;
     return required_limits;
 }
 

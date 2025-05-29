@@ -234,11 +234,6 @@ void Application::MainLoop() {
 	m_renderer.queue.writeBuffer(
 			transformBuffer, 0, &uniforms, sizeof(Uniforms));
 
-	// Sort the splats
-	glm::vec3 cameraPos = glm::vec3(camera->worldMatrix[3]);
-	//splatMesh.sortSplats(cameraPos);
-	splatMesh.update(cameraPos);
-
 	// Get the next target texture view
 	TextureView targetView = m_renderer.get_next_surface_texture_view();
 	if (!targetView) return;
@@ -253,16 +248,12 @@ void Application::MainLoop() {
 		targetView, encoder);
 
 	// Select which render pipeline to use
-	renderPass.setPipeline(pipeline);
-
-	// Set vertex buffer while encoding the render pass
-	splatMesh.setBuffers(renderPass);
+	renderPass.setPipeline(pipeline);	
 
 	// Set binding group here!
 	renderPass.setBindGroup(0, bindGroup, 0, nullptr);
 
-	// Draw the splat
-	renderPass.drawIndexed(6, splatMesh.splatCount, 0, 0, 0);
+	splatMesh.render(renderPass, camera, gui.params);
 
 	gui.update(renderPass);
 
@@ -385,13 +376,13 @@ void Application::InitializePipeline() {
 	bindingLayouts[1].visibility = ShaderStage::Vertex;
 	bindingLayouts[1].buffer.type = BufferBindingType::ReadOnlyStorage;
 	bindingLayouts[1].buffer.minBindingSize =
-		splatMesh.splatCount * sizeof(Splat);
+		splatMesh.splatData.size() * sizeof(Splat);
 
 	bindingLayouts[2].binding = 2;
 	bindingLayouts[2].visibility = ShaderStage::Vertex;
 	bindingLayouts[2].buffer.type = BufferBindingType::ReadOnlyStorage;
 	bindingLayouts[2].buffer.minBindingSize =
-		splatMesh.splatCount * sizeof(uint32_t);
+		splatMesh.splatData.size() * sizeof(uint32_t);
 
 	// Create a bind group layout
 	BindGroupLayoutDescriptor bindGroupLayoutDesc{};
@@ -424,15 +415,13 @@ void Application::InitializeBuffers() {
 	s.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
 
 	splats.push_back(s);
-
-	splatMesh.splatCount = 1;
 	splatMesh.splatData = splats;
 	
 
 
 	// Load the splat data
 	splatMesh.loadData(RESOURCE_DIR "/splats/nike.splat", true);
-	std::cout << "Loaded " << splatMesh.splatCount << " splats" << std::endl;
+	//std::cout << "Loaded " << splatMesh.splatData.size() << " splats" << std::endl;
 
 	splatMesh.initialize(m_renderer.device, m_renderer.queue);
 
@@ -456,12 +445,12 @@ void Application::InitializeBindGroups() {
 	bindings[1].binding = 1;
 	bindings[1].buffer = splatMesh.splatBuffer;
 	bindings[1].offset = 0;
-	bindings[1].size = splatMesh.splatCount * sizeof(Splat);
+	bindings[1].size = splatMesh.splatData.size() * sizeof(Splat);
 
 	bindings[2].binding = 2;
 	bindings[2].buffer = splatMesh.sortIndexBuffer;
 	bindings[2].offset = 0;
-	bindings[2].size = splatMesh.splatCount * sizeof(uint32_t);
+	bindings[2].size = splatMesh.splatData.size() * sizeof(uint32_t);
 
 	// A bind group contains one or multiple bindings
 	BindGroupDescriptor bindGroupDesc{};
@@ -484,8 +473,6 @@ void Application::InitializeScene() {
 	splatNode->scale = glm::vec3(1.0f, 1.0f, 1.0f);
 	scene->addChild(splatNode);
 	std::cout << "Scene initialized" << std::endl;
-	glm::vec3 cameraPos = glm::vec3(camera->worldMatrix[3]);
-	splatMesh.sortIndices = splatMesh.sortSplats(cameraPos);
 };
 
 void Application::UpdateScene() {

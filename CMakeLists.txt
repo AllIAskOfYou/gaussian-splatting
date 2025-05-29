@@ -40,6 +40,11 @@ add_executable(App
 
 	GUI.hpp
 	GUI.cpp
+
+	BB.hpp
+
+	Octree.hpp
+	Octree.cpp
 )
 
 target_include_directories(App PRIVATE .)

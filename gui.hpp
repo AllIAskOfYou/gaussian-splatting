@@ -21,6 +21,9 @@ public:
         float bayerScale = 1.0f;
         float orbitRate = 1.0f;
         float scrollRate = 1.0f;
+
+        uint32_t depth = 0;
+        float min_screen_area = 0.2f;
     } params;
 
     ImGuiIO imGuiIo;

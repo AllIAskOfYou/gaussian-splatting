@@ -94,6 +94,21 @@ void GUI::update(RenderPassEncoder renderPass) {
 		ImGui::EndTable();
 	}
 
+	ImGui::Text("Debug");
+
+	if (ImGui::BeginTable("table4", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersOuter)) {
+		ImGui::TableSetupColumn("Text", ImGuiTableColumnFlags_WidthFixed, columnWidth); // Auto stretch
+		ImGui::TableSetupColumn("Slider", ImGuiTableColumnFlags_None, 2*columnWidth); // Fixed width
+
+		ImGui::TableNextRow();
+		ImGui::TableNextRow();
+
+		add_int_slider("Depth", reinterpret_cast<int*>(&params.depth), 0, 4);
+		add_float_slider("Min Screen Area", &params.min_screen_area, 0.0f, 1.0f);
+
+		ImGui::EndTable();
+	}
+
 	ImGui::Separator();
 	ImGui::Text("STATS");
 	// Show fps

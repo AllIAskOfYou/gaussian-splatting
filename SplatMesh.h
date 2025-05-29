@@ -6,6 +6,8 @@
 #include <execution>
 #include "Splat.h"
 #include "ResourceManager.h"
+#include "Camera.h"
+#include <memory>
 // include library for measuring time
 #include <chrono>
 
@@ -22,12 +24,14 @@ using namespace wgpu;
 // iterative merge sort.
 #include <iostream>
 #include <vector>
+#include "Octree.hpp"
+#include "gui.hpp"
 using namespace std;
 
 class SplatMesh {
 public:
+    Octree octree;
     std::vector<Splat> splatData;
-    uint32_t splatCount;
 
     Buffer splatBuffer;
     Buffer sortIndexBuffer;
@@ -42,15 +46,44 @@ public:
     Device device;
     Queue queue;
 
-    std::vector<uint32_t> sortIndices;
+    void render(RenderPassEncoder &renderPass,
+            Camera::Ptr camera, GUI::Parameters &params) {
+        // Set the vertex buffer and index buffer for the splat mesh
+        setBuffers(renderPass);
+        std::vector<uint32_t> indices = octree.get_indices_depth(params.depth);
+        //std::vector<uint32_t> indices =
+        //    octree.get_indices(camera, params.min_screen_area*0.01);
+        //std::cout << "Rendering " << indices.size() << " splats at depth "
+        //    << params.depth << std::endl;
+        auto cameraPos = glm::vec3(camera->worldMatrix[3]);;
+        sortSplats(indices, cameraPos);
+        queue.writeBuffer(sortIndexBuffer, 0, indices.data(),
+            indices.size() * sizeof(uint32_t));
+        renderPass.drawIndexed(6, indices.size(), 0, 0, 0);
+    }
 
     void loadData(const std::string &path, bool center) {
-        bool success = ResourceManager::loadSplats(path, splatData, center);       
-        if (!success) {
-            std::cerr << "Could not load splat!" << std::endl;
-            exit(1);
-        }
-        splatCount = static_cast<uint32_t>(splatData.size());	
+        //bool success = ResourceManager::loadSplats(path, splatData, center);       
+        //if (!success) {
+        //    std::cerr << "Could not load splat!" << std::endl;
+        //    exit(1);
+        //}
+        //splatCount = static_cast<uint32_t>(splatData.size());	
+
+        SplatSplitVector splats_s = ResourceManager::loadSplatsRaw(path, center);
+        // keep only the first 100 splats
+        //const uint32_t maxSplats = 100;
+        //if (splatsRaw.size() > maxSplats) {
+        //    splatsRaw.resize(maxSplats);
+        //}
+        std::cout << splats_s.size() << " splats loaded from " << path << std::endl;
+        octree.build(splats_s);
+        //octree.generate_debug();
+        octree.generate();
+        std::cout << "Octree built with " << octree.splats.size() << " splats." << std::endl;
+        splatData = octree.splats;
+        std::cout << "Splat Transform: " << splatData[0].transform << std::endl;
+
     }
 
     void initialize(Device &device, Queue &queue) {
@@ -58,16 +91,6 @@ public:
         this->queue = queue;
         initializeBuffers();
         initializeVertexBufferLayouts();
-        sortIndices.resize(splatCount);
-        for (uint32_t i = 0; i < splatCount; i++) {
-            sortIndices[i] = i;
-        }
-        //queue.writeBuffer(sortIndexBuffer, 0, sortIndices.data(), splatCount * sizeof(uint32_t)); 
-    }
-
-    void update(glm::vec3 cameraPos) {
-        sortIndices = sortSplats(cameraPos);
-        queue.writeBuffer(sortIndexBuffer, 0, sortIndices.data(), splatCount * sizeof(uint32_t)); 
     }
 
     void setBuffers(RenderPassEncoder &renderPass) {
@@ -75,18 +98,14 @@ public:
         renderPass.setIndexBuffer(indexQuadBuffer, IndexFormat::Uint16, 0, indexQuadBuffer.getSize());
     }
 
-    std::vector<uint32_t> sortSplats(glm::vec3 cameraPos) {
+    void sortSplats(std::vector<uint32_t> &indices,
+            glm::vec3 cameraPos) {
         // measure the time needed to sort the splats
-
-        std::vector<uint32_t> sort_indices(splatCount);
-        for (uint32_t i = 0; i < splatCount; i++) {
-            sort_indices[i] = sortIndices[i];
-        }
 
         auto start = std::chrono::high_resolution_clock::now();
 
-        std::vector<float> distances(splatCount);
-        for (uint32_t i = 0; i < splatCount; i++) {
+        std::vector<float> distances(splatData.size());
+        for (uint32_t i : indices) {
             glm::vec3 position = glm::vec3(splatData[i].transform[3]);
             distances[i] = glm::distance(position, cameraPos);
         }
@@ -95,12 +114,12 @@ public:
         #ifdef PARALLEL
         tbb::task_arena arena(8);
         arena.execute([&] {
-            std::sort(std::execution::par, sort_indices.begin(), sort_indices.end(), [&](uint32_t a, uint32_t b) {
+            std::sort(std::execution::par, indices.begin(), indices.end(), [&](uint32_t a, uint32_t b) {
                 return distances[a] > distances[b];
             });
         });
         #else
-        std::sort(sort_indices.begin(), sort_indices.end(), [&](uint32_t a, uint32_t b) {
+        std::sort(indices.begin(), indices.end(), [&](uint32_t a, uint32_t b) {
             return distances[a] > distances[b];
         });
         #endif
@@ -109,8 +128,6 @@ public:
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = end - start;
         std::cout << "Time needed to sort the splats: " << elapsed.count() << "s" << std::endl;
-
-        return sort_indices;
     }
 
     ~SplatMesh() {
