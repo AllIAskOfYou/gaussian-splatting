@@ -30,8 +30,8 @@ using namespace std;
 
 class SplatMesh {
 public:
-    Octree octree;
-    std::vector<Splat> splatData;
+    SplatVector splatData;
+    std::vector<uint32_t> indices;
 
     Buffer splatBuffer;
     Buffer sortIndexBuffer;
@@ -46,44 +46,27 @@ public:
     Device device;
     Queue queue;
 
-    void render(RenderPassEncoder &renderPass,
+    virtual void render(RenderPassEncoder &renderPass,
             Camera::Ptr camera, GUI::Parameters &params) {
+        (void)params; // to avoid unused parameter warning
         // Set the vertex buffer and index buffer for the splat mesh
         setBuffers(renderPass);
-        std::vector<uint32_t> indices = octree.get_indices_depth(params.depth);
-        //std::vector<uint32_t> indices =
-        //    octree.get_indices(camera, params.min_screen_area*0.01);
-        //std::cout << "Rendering " << indices.size() << " splats at depth "
-        //    << params.depth << std::endl;
-        auto cameraPos = glm::vec3(camera->worldMatrix[3]);;
+        auto cameraPos = glm::vec3(camera->worldMatrix[3]);
         sortSplats(indices, cameraPos);
         queue.writeBuffer(sortIndexBuffer, 0, indices.data(),
             indices.size() * sizeof(uint32_t));
         renderPass.drawIndexed(6, indices.size(), 0, 0, 0);
     }
 
-    void loadData(const std::string &path, bool center) {
-        //bool success = ResourceManager::loadSplats(path, splatData, center);       
-        //if (!success) {
-        //    std::cerr << "Could not load splat!" << std::endl;
-        //    exit(1);
-        //}
-        //splatCount = static_cast<uint32_t>(splatData.size());	
-
+    virtual void loadData(const std::string &path, bool center) {
         SplatSplitVector splats_s = ResourceManager::loadSplatsRaw(path, center);
-        // keep only the first 100 splats
-        //const uint32_t maxSplats = 100;
-        //if (splatsRaw.size() > maxSplats) {
-        //    splatsRaw.resize(maxSplats);
-        //}
         std::cout << splats_s.size() << " splats loaded from " << path << std::endl;
-        octree.build(splats_s);
-        //octree.generate_debug();
-        octree.generate();
-        std::cout << "Octree built with " << octree.splats.size() << " splats." << std::endl;
-        splatData = octree.splats;
-        std::cout << "Splat Transform: " << splatData[0].transform << std::endl;
-
+        splatData.resize(splats_s.size());
+        for (size_t i = 0; i < splats_s.size(); i++) {
+            splatData[i] = split_to_splat(splats_s[i]);
+        }
+        indices.resize(splatData.size());
+        std::iota(indices.begin(), indices.end(), 0);
     }
 
     void initialize(Device &device, Queue &queue) {
@@ -206,7 +189,7 @@ private:
 
         // Describe the position attribute
         quadAttribs[0].shaderLocation = 0; // @location(4)
-        quadAttribs[0].format = VertexFormat::Float32x3;
+        quadAttribs[0].format = VertexFormat::Float32x2;
         quadAttribs[0].offset = 0;
 
         vertexBufferLayouts[0].attributeCount = static_cast<uint32_t>(quadAttribs.size());

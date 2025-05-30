@@ -4,6 +4,7 @@
 #include <memory>
 #include <glm/glm.hpp>
 #include <iostream>
+#include <chrono>
 
 #include "Splat.h"
 #include "BB.hpp"
@@ -55,7 +56,6 @@ const std::vector<glm::vec4> COLORS = {
 
 class Octree {
 public:
-    using Indices = std::vector<uint32_t>;
     class Node {
     public:
         using Ptr = std::shared_ptr<Node>;
@@ -68,7 +68,7 @@ public:
             return children.empty();
         }
     };
-    using NodeVector = std::vector<std::shared_ptr<Node>>;
+    using NodeVector = std::vector<Node::Ptr>;
 
 public:
     Node::Ptr root;
@@ -129,13 +129,24 @@ public:
     }
 
     Indices get_indices_depth(uint32_t depth) {
+        //auto start = std::chrono::high_resolution_clock::now();
+        //Indices indices(splats.size());
         Indices indices;
+        //auto end = std::chrono::high_resolution_clock::now();
+        //std::chrono::duration<double> elapsed = end - start;
+        //std::cout << "Time needed to initialize indices: " << elapsed.count() << "s" << std::endl;
+        //uint32_t size{0};
+        
         for (const auto &node : queue) {
             if (node->depth == depth) {
+                //memcpy(indices.data() + size, node->indices.data(),
+                //       node->indices.size() * sizeof(uint32_t));
+                //size += node->indices.size();
                 indices.insert(indices.end(), node->indices.begin(), node->indices.end());
             }
         }
-        return indices;            
+        //indices.resize(size);
+        return indices;    
     }
 
     SplatVector *data() {

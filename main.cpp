@@ -30,6 +30,8 @@
 #include "OrbitCamera.h"
 
 #include "SplatMesh.h"
+#include "SplatMeshOctree.hpp"
+#include "SplatMeshHC.hpp"
 
 using namespace wgpu;
 
@@ -90,7 +92,9 @@ private:
 	std::shared_ptr<Camera> camera = std::make_shared<Camera>();
 	std::shared_ptr<Node> splatNode = std::make_shared<Node>();
 
-	SplatMesh splatMesh;
+	//SplatMesh splatMesh;
+	//SplatMeshOctree splatMesh;
+	SplatMeshHC splatMesh;
 
 	// OTHER ----------------------------------------------------------
 	float width = 1200;

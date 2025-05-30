@@ -19,12 +19,21 @@ struct SplatSplit {
 struct Splat {
 	glm::mat4 transform;
 	glm::vec4 color;
+
+	
+	float weight() const {
+		float alpha = color.w;
+		float volume = 1.333 * glm::sqrt(glm::determinant(transform));
+		return alpha * volume;
+	}
 };
 
 
 using SplatRawVector = std::vector<SplatRaw>;
 using SplatSplitVector = std::vector<SplatSplit>;
 using SplatVector = std::vector<Splat>;
+
+using Indices = std::vector<uint32_t>;
 
 inline glm::mat4 quat_to_rot(glm::vec4 q) {
 	glm::mat4 rot = glm::mat3(1.0f);
@@ -132,4 +141,56 @@ inline Splat merge(SplatSplitVector &splats_raw) {
 	splat.transform[3] = glm::vec4(center, 1.0f);
 	splat.color = color;
 	return splat;
+}
+
+inline Splat merge_splats(Splat &a, Splat &b, float w_a, float w_b) {
+	auto a_center = glm::vec3(a.transform[3]);
+	auto b_center = glm::vec3(b.transform[3]);
+	auto center = w_a * a_center + w_b * b_center;
+
+	auto a_cov = glm::mat3(a.transform);
+	auto b_cov = glm::mat3(b.transform);
+	auto a_diff = a_center - center;
+	auto b_diff = b_center - center;
+	auto covariance = w_a * (a_cov + glm::outerProduct(a_diff, a_diff)) +
+		w_b * (b_cov + glm::outerProduct(b_diff, b_diff));
+
+	
+	Splat splat;
+	splat.transform = glm::mat4(covariance);
+	splat.transform[3] = glm::vec4(center, 1.0f);
+	splat.color = w_a * a.color + w_b * b.color;
+	return splat;
+}
+
+inline float trace(const glm::mat3 &a) {
+	return a[0][0] + a[1][1] + a[2][2];
+}
+
+inline float kl_divergence(const Splat &a, const Splat &b) {
+	auto a_center = glm::vec3(a.transform[3]);
+	auto b_center = glm::vec3(b.transform[3]);
+	auto a_cov = glm::mat3(a.transform);
+	auto b_cov = glm::mat3(b.transform);
+
+	auto diff = a_center - b_center;
+	auto cov_inv = glm::inverse(b_cov);
+	float trace_term = trace(cov_inv * a_cov);
+	float det_term = glm::log(glm::determinant(b_cov)
+		/ glm::determinant(a_cov));
+	float kl_div = 0.5f * (trace_term +
+		glm::dot(diff, cov_inv * diff) - 3.0f + det_term);
+	return kl_div;
+}
+
+inline float sym_kl_divergence(const Splat &a, const Splat &b) {
+	return 0.5f * (kl_divergence(a, b) + kl_divergence(b, a));
+}
+
+inline float splat_divergence(const Splat &a, const Splat &b) {
+	float kl = sym_kl_divergence(a, b);
+	auto color_diff = a.color - b.color;
+	float color_dist = glm::length(glm::vec3(color_diff));
+	float alpha_dist = glm::abs(a.color.w - b.color.w);
+	return kl + color_dist + alpha_dist;
 }

@@ -139,6 +139,7 @@ void Octree::build(SplatSplitVector splats_raw) {
             size++;
         }
     }
+    queue.resize(counter);
 
 
     std::cout << "Octree built with " << queue.size() << " nodes." << std::endl;
@@ -185,7 +186,7 @@ void Octree::generate() {
     }
 }
 
-Octree::Indices Octree::get_indices(Camera::Ptr camera, float min_screen_area) {
+Indices Octree::get_indices(Camera::Ptr camera, float min_screen_area) {
     queue[0] = root;
     uint32_t counter{0};
     uint32_t size{1};

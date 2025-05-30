@@ -34,6 +34,8 @@ add_executable(App
 	OrbitCamera.h
 
 	SplatMesh.h
+	SplatMeshOctree.hpp
+	SplatMeshHC.hpp
 
 	Renderer.hpp
 	Renderer.cpp
@@ -45,6 +47,9 @@ add_executable(App
 
 	Octree.hpp
 	Octree.cpp
+
+	HC.hpp
+	HC.cpp
 )
 
 target_include_directories(App PRIVATE .)
@@ -82,7 +87,7 @@ set_target_properties(App PROPERTIES
 if (MSVC)
 	target_compile_options(App PRIVATE /W4)
 else()
-	target_compile_options(App PRIVATE -Wall -Wextra -pedantic)
+	target_compile_options(App PRIVATE -Wall -Wextra -pedantic -O3)
 endif()
 
 if (XCODE)

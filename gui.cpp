@@ -103,7 +103,7 @@ void GUI::update(RenderPassEncoder renderPass) {
 		ImGui::TableNextRow();
 		ImGui::TableNextRow();
 
-		add_int_slider("Depth", reinterpret_cast<int*>(&params.depth), 0, 4);
+		add_int_slider("Depth", reinterpret_cast<int*>(&params.depth), 0, 30);
 		add_float_slider("Min Screen Area", &params.min_screen_area, 0.0f, 1.0f);
 
 		ImGui::EndTable();
