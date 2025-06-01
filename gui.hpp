@@ -24,6 +24,9 @@ public:
 
         uint32_t depth = 0;
         float min_screen_area = 0.2f;
+        float weight_e = 0.0f;
+        float weight_w = 0.0f;
+        float weight_d = 0.0f;
     } params;
 
     ImGuiIO imGuiIo;

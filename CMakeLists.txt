@@ -36,6 +36,8 @@ add_executable(App
 	SplatMesh.h
 	SplatMeshOctree.hpp
 	SplatMeshHC.hpp
+	SplatMeshGridHC.hpp
+	SplatMeshGridHC.cpp
 
 	Renderer.hpp
 	Renderer.cpp
@@ -50,6 +52,9 @@ add_executable(App
 
 	HC.hpp
 	HC.cpp
+
+	GridHC.hpp
+	GridHC.cpp
 )
 
 target_include_directories(App PRIVATE .)

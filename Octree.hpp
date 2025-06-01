@@ -119,9 +119,9 @@ public:
                 //std::cout << splat.transform[3].x << " "
                 //          << splat.transform[3].y << " "
                 //          << splat.transform[3].z << std::endl;
-                //splat.color = COLORS[node_index % COLORS.size()];
+                splat.color = COLORS[node_index % COLORS.size()];
                 //splat.color = COLORS[node->depth % COLORS.size()];
-                //splat.color.w = 1.0f;
+                splat.color.w = 1.0f;
                 splats.push_back(splat);
                 node->indices.push_back(splats.size() - 1);
             }
@@ -136,14 +136,26 @@ public:
         //std::chrono::duration<double> elapsed = end - start;
         //std::cout << "Time needed to initialize indices: " << elapsed.count() << "s" << std::endl;
         //uint32_t size{0};
-        
-        for (const auto &node : queue) {
-            if (node->depth == depth) {
+        queue.clear();
+        queue.reserve(splats.size());
+        queue.push_back(root);
+        std::vector<Node::Ptr> q_tmp;
+        while (!(queue.empty())) {
+            Node::Ptr node = queue.back();
+            queue.pop_back();
+            if (node->depth > depth || node->is_leaf()) {
+                q_tmp.push_back(node);
                 //memcpy(indices.data() + size, node->indices.data(),
                 //       node->indices.size() * sizeof(uint32_t));
                 //size += node->indices.size();
-                indices.insert(indices.end(), node->indices.begin(), node->indices.end());
+                continue;
             }
+            for (auto &child : node->children) {
+                queue.push_back(child);
+            }
+        }
+        for (auto &node : q_tmp) {
+            indices.insert(indices.end(), node->indices.begin(), node->indices.end());
         }
         //indices.resize(size);
         return indices;    

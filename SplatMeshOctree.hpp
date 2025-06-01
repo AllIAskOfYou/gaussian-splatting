@@ -39,14 +39,14 @@ public:
         setBuffers(renderPass);
         // time indices
         auto start = std::chrono::high_resolution_clock::now();
-        indices = octree.get_indices_depth(params.depth);
-        //std::vector<uint32_t> indices =
-        //    octree.get_indices(camera, params.min_screen_area*0.01);
+        //indices = octree.get_indices_depth(params.depth);
+        std::vector<uint32_t> indices =
+            octree.get_indices(camera, params.min_screen_area*0.01);
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = end - start;
         std::cout << "Time needed to get indices: " << elapsed.count() << "s" << std::endl;
-        //std::cout << "Rendering " << indices.size() << " splats at depth "
-        //    << params.depth << std::endl;
+        std::cout << "Rendering " << indices.size() << " splats at depth "
+            << params.depth << std::endl;
         auto cameraPos = glm::vec3(camera->worldMatrix[3]);
         sortSplats(indices, cameraPos);
         queue.writeBuffer(sortIndexBuffer, 0, indices.data(),

@@ -32,6 +32,7 @@
 #include "SplatMesh.h"
 #include "SplatMeshOctree.hpp"
 #include "SplatMeshHC.hpp"
+#include "SplatMeshGridHC.hpp"
 
 using namespace wgpu;
 
@@ -94,10 +95,10 @@ private:
 
 	//SplatMesh splatMesh;
 	//SplatMeshOctree splatMesh;
-	SplatMeshHC splatMesh;
+	SplatMeshGridHC splatMesh;
 
 	// OTHER ----------------------------------------------------------
-	float width = 1200;
+	float width = 1000;
 	float height = 800;
 
 

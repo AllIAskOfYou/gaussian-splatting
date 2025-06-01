@@ -142,14 +142,64 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	
 	//var x = in.position.x;
 	//var y = in.position.y;
-	//var bayerValue: f32 = (x % 4.0) * 4.0 + (y % 4.0);
-	//alpha = select(0.0, 1.0, alpha * (16.0 + 1.0) > (bayerValue + 1.0));
+	//var bayerIndex: f32 = (x % 4.0) * 4.0 + (y % 4.0);
+	//var bayerIndex: f32 = (x % 2) * 2 + (y % 2);
+	//var bayerValue = bayerIndex;
 
+	//alpha = select(0.0, 1.0, alpha * (16.0 + 1.0) > (bayerValue + 1.0));
+/*
+	var bayerTable = array<u32, 96>
+	(0, 1, 2, 3,
+	 0, 1, 3, 2,
+	 0, 2, 1, 3,
+	 0, 2, 3, 1,
+	 0, 3, 1, 2,
+	 0, 3, 2, 1,
+	 1, 0, 2, 3,
+	 1, 0, 3, 2,
+	 1, 2, 0, 3,
+	 1, 2, 3, 0,
+	 1, 3, 0, 2,
+	 1, 3, 2, 0,
+	 2, 0, 1, 3,
+	 2, 0, 3, 1,
+	 2, 1, 0, 3,
+	 2, 1, 3, 0,
+	 2, 3, 0, 1,
+	 2, 3, 1, 0,
+	 3, 0, 1, 2,
+	 3, 0, 2, 1,
+	 3, 1, 0, 2,
+	 3, 1, 2, 0,
+	 3, 2, 0, 1,
+	 3, 2, 1, 0);
+	 */
 	//var x = u32(in.position.x);
 	//var y = u32(in.position.y);
+	//var bayerValue = bayerTable[((x & 3u) << 2) + (y & 3u)];
 	//var bayerValue = ((x & 3u) << 2) + (y & 3u);
+	//var bayerIndex = (in.instanceIndex % 24) * 4 + ((x & 1u) << 1) + (y & 1u);
+	//var bayerValue = bayerTable[bayerIndex];
+	//if ((alpha * uniforms.bayerScale) * f32(BAYER_SIZE * BAYER_SIZE + 1) < f32(bayerValue) + 1) {
+	//	discard;
+	//}
+	//return vec4f(in.color.xyz, 1.0f);
+	//if (bayerIndex == 0u) {
+	//	return vec4f(in.color.xyz, f32(alpha * f32(5) > f32(0) + 1.0));
+	//}
+	//if (bayerIndex == 1u) {
+	//	return vec4f(in.color.xyz, f32(alpha * f32(5) > f32(1) + 1.0));
+	//}
+	//if (bayerIndex == 2u) {
+	//	return vec4f(in.color.xyz, f32(alpha * f32(5) > f32(3) + 1.0));
+	//}
+	//return vec4f(in.color.xyz, f32(alpha * f32(5) > f32(2) + 1.0));
+	//var bayerValue = bayerIndex;
+	//alpha = select(0.0, 1.0, (alpha) * f32(4 + 1) > f32(bayerValue) + 1);
+
 	//alpha = select(0.0, 1.0, (alpha) * f32(16 + 1) > f32(bayerValue) + 1);
 	//return vec4f(in.color.xyz, alpha);
+	
 	var x = in.position.x;
 	var y = in.position.y;
 	var bayerValue = f32(generate_bayer(u32(x), u32(y), BAYER_SIZE, u32(in.instanceIndex)));
@@ -158,4 +208,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	}
 	var color = vec4f(in.color.xyz, 1.0f);
 	return color;
+	
 }

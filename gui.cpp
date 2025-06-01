@@ -103,8 +103,23 @@ void GUI::update(RenderPassEncoder renderPass) {
 		ImGui::TableNextRow();
 		ImGui::TableNextRow();
 
-		add_int_slider("Depth", reinterpret_cast<int*>(&params.depth), 0, 30);
+		add_int_slider("Depth", reinterpret_cast<int*>(&params.depth), 0, 2000);
 		add_float_slider("Min Screen Area", &params.min_screen_area, 0.0f, 1.0f);
+
+		ImGui::EndTable();
+	}
+
+
+	if (ImGui::BeginTable("table5", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersOuter)) {
+		ImGui::TableSetupColumn("Text", ImGuiTableColumnFlags_WidthFixed, columnWidth); // Auto stretch
+		ImGui::TableSetupColumn("Slider", ImGuiTableColumnFlags_None, 2*columnWidth); // Fixed width
+
+		ImGui::TableNextRow();
+		ImGui::TableNextRow();
+
+		add_float_slider("Weight E", &params.weight_e, 0.0f, 1.0f);
+		add_float_slider("Weight W", &params.weight_w, 0.0f, 1.0f);
+		add_float_slider("Weight D", &params.weight_d, 0.0f, 1.0f);
 
 		ImGui::EndTable();
 	}

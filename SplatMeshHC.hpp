@@ -69,10 +69,17 @@ public:
             splats[i] = split_to_splat(splats_s[i]);
         }
         // keep only the first 100 splats
-        const uint32_t maxSplats = 2000;
+        const uint32_t maxSplats = 500;
         if (splats.size() > maxSplats) {
             splats.resize(maxSplats);
         }
+        //SplatVector splats_new;
+        //for (auto splat : splats) {
+        //    if (splat.transform[3][0] > 1.25f) {
+        //        splats_new.push_back(splat);
+        //    }
+        //}
+        //splats = splats_new;
         std::cout << splats.size() << " splats loaded from " << path << std::endl;
         auto start = std::chrono::high_resolution_clock::now();
         hc.build(splats);
@@ -81,7 +88,5 @@ public:
         std::cout << "Time needed to build HC: " << elapsed.count() << "s" << std::endl;
         std::cout << "HC built with " << hc.splats.size() << " splats." << std::endl;
         splatData = hc.splats;
-        std::cout << "Splat Transform: " << splatData[0].transform << std::endl;
-
     }
 };

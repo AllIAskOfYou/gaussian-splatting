@@ -155,7 +155,6 @@ inline Splat merge_splats(Splat &a, Splat &b, float w_a, float w_b) {
 	auto covariance = w_a * (a_cov + glm::outerProduct(a_diff, a_diff)) +
 		w_b * (b_cov + glm::outerProduct(b_diff, b_diff));
 
-	
 	Splat splat;
 	splat.transform = glm::mat4(covariance);
 	splat.transform[3] = glm::vec4(center, 1.0f);

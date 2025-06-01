@@ -1,21 +1,26 @@
 #include "HC.hpp"
 #include <list>
 
-void HC::build(SplatVector splats_init) {
+void HC::build(SplatVector splats_init, bool verbose) {
     std::priority_queue<Node::Ptr, std::vector<Node::Ptr>, HCComparator> queue;
     splats.reserve(2 * splats_init.size());
 
-    std::cout << "HC: Building tree with " << splats.size() << " splats." << std::endl;
+    if (verbose) {
+        std::cout << "HC: Building tree with " << splats_init.size() << " splats." << std::endl;
+    }
     for (const auto &splat : splats_init) {
         auto node = std::make_shared<Node>();
         node->depth = 0;
-        node->index = nodes.size();
+        node->index = splats.size();
+        node->splat = splat;
         node->error = 0.0f;
         node->nodes_it = nodes.insert(nodes.end(), node);
         splats.push_back(splat);
     }
 
-    std::cout << "HC: Building queue with " << nodes.size() << " nodes." << std::endl;
+    if (verbose) {
+        std::cout << "HC: Building queue with " << nodes.size() << " nodes." << std::endl;
+    }
 
     for (auto it = nodes.begin(); it != nodes.end(); ++it) {
         auto a = *it;
@@ -29,7 +34,9 @@ void HC::build(SplatVector splats_init) {
         }
     }
 
-    std::cout << "HC: Merging " << nodes.size() << " nodes." << std::endl;
+    if (verbose) {
+        std::cout << "HC: Merging " << nodes.size() << " nodes." << std::endl;
+    }
 
     while (!queue.empty()) {
         auto merged = queue.top();
@@ -37,6 +44,9 @@ void HC::build(SplatVector splats_init) {
         if (merged->children[0]->processed || merged->children[1]->processed) {
             continue;
         }
+
+        merged->index = splats.size();
+        splats.push_back(merged->splat);
 
         //std::cout << "HC: Merging nodes: "
         //          << merged->children[0]->index << " and "
@@ -69,6 +79,9 @@ void HC::build(SplatVector splats_init) {
         for (auto it = nodes.begin(); it != nodes.end(); ++it) {
             auto c = *it;
             auto node = merge_nodes(merged, c);
+            if (node->error > params.max_error) {
+                continue;
+            }
             queue.push(node);
         }
         
@@ -76,35 +89,80 @@ void HC::build(SplatVector splats_init) {
         merged->nodes_it = nodes.insert(nodes.end(), merged);
     }
 
-    std::cout << "HC: Found " << nodes.size() << " root nodes." << std::endl;
-    std::cout << "HC: First root depth: " << nodes.front()->depth << std::endl;
-    std::cout << "HC: Built tree with " << splats.size() << " splats." << std::endl;
+    if (verbose) {
+        std::cout << "HC: Found " << nodes.size() << " root nodes." << std::endl;
+        std::cout << "HC: First root depth: " << nodes.front()->depth << std::endl;
+        std::cout << "HC: Built tree with " << splats.size() << " splats." << std::endl;
+    }
             
 }
 
-Indices get_indices(Camera::Ptr camera, float min_screen_area) {
-    (void)camera;
-    (void)min_screen_area;
+Indices HC::get_indices(Camera::Ptr camera, float threshold, MetricWeights w) {
     Indices indices;
+    std::vector<Node::Ptr> queue;
+    uint32_t pos{0};
+
+    for (auto &node : nodes) {
+        queue.push_back(node);
+    }
+
+    auto camera_pos = glm::vec3(camera->worldMatrix[3]);
+    while (!queue.empty() && pos < queue.size()) {
+        auto node = queue[pos];
+        auto splat_pos = glm::vec3(node->splat.transform[3]);
+        auto splat_dist = glm::length(splat_pos - camera_pos);
+        auto weight = node->splat.weight();
+        auto error = node->error;
+        auto dist = 1 / (splat_dist * splat_dist);
+        //float metric = glm::pow(error, w.e) *
+        //    glm::pow(weight, w.w) * glm::pow(dist, w.d);
+        float metric = error * weight * dist;
+        if (metric < threshold || node->is_leaf()) {
+            pos++;
+            continue;
+        }
+        queue.erase(queue.begin() + pos);
+        queue.push_back(node->children[0]);
+        queue.push_back(node->children[1]);
+    }
+    for (auto &node : queue) {
+        indices.push_back(node->index);
+    }
     return indices;
 }
 
 Indices HC::get_indices_depth(uint32_t depth) {
     std::vector<uint32_t> indices;
     std::vector<Node::Ptr> queue;
+    uint32_t counter{0};
+    uint32_t pos{0};
+    //std::cout << "HC: Getting indices at depth " << depth << std::endl;
     for (auto &node : nodes) {
         queue.push_back(node);
     }
-    while (!queue.empty()) {
-        auto node = queue.back();
-        queue.pop_back();
-        if (node->depth == depth) {
-            indices.push_back(node->index);
-        } else if (node->depth > depth) {
-            queue.push_back(node->children[0]);
-            queue.push_back(node->children[1]);
+    while (!queue.empty() && pos < queue.size()) {
+        if (counter >= depth) {
+            break;
         }
+        counter++;
+        auto node = queue[pos];
+        if (node->is_leaf()) {
+            pos++;
+            continue;
+        }
+        queue.erase(queue.begin() + pos);
+        queue.push_back(node->children[0]);
+        queue.push_back(node->children[1]);
+        //if (node->depth == depth) {
+        //    indices.push_back(node->index);
+        //} else if (node->depth > depth) {
+        //    queue.push_back(node->children[0]);
+        //    queue.push_back(node->children[1]);
+        //}
     }
-    std::cout << "HC: Found " << indices.size() << " splats at depth " << depth << std::endl;
+    for (auto &node : queue) {
+        indices.push_back(node->index);
+    }
+    //std::cout << "HC: Found " << indices.size() << " splats at depth " << depth << std::endl;
     return indices;
 }

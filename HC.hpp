@@ -16,7 +16,13 @@
 class HC {
 public:
     struct Params {
-        float max_error{0.01f};
+        float max_error{std::numeric_limits<float>::infinity()};
+    };
+
+    struct MetricWeights {
+        float e{0.0f};
+        float w{0.0f};
+        float d{0.0f};
     };
 
     class Node {
@@ -49,8 +55,9 @@ public:
     HC() = default;
     HC(const Params &params) : params(params) {}
 
-    void build(SplatVector splats_init);
-    Indices get_indices(Camera::Ptr camera, float min_screen_area);
+    void build(SplatVector splats_init, bool verbose = true);
+    Indices get_indices(
+        Camera::Ptr camera, float threshold, MetricWeights w);
     Indices get_indices_depth(uint32_t depth);
 
 private:
@@ -78,11 +85,10 @@ private:
 
         auto node = std::make_shared<Node>();
         node->depth = std::max(a->depth, b->depth) + 1;
-        node->index = splats.size();
+        node->splat = splat_c;
         node->error = error;
         node->children[0] = a;
         node->children[1] = b;
-        splats.push_back(splat_c);
 
         return node;
     }
